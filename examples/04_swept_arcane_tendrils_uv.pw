@@ -1,0 +1,285 @@
+{
+  "name": "04_Swept_Arcane_Tendrils_UV",
+  "version": "1.0.0",
+  "nodes": [
+    {
+      "id": "grid_floor",
+      "type": "SOP_Grid",
+      "name": "SOP_Grid_AltarFloor",
+      "is_bypassed": false,
+      "params": {
+        "size_x": 7.5,
+        "size_z": 7.5,
+        "rows": 40,
+        "cols": 40
+      },
+      "inputs": {},
+      "x": -520.0,
+      "y": -260.0
+    },
+    {
+      "id": "mtn_floor",
+      "type": "SOP_Mountain",
+      "name": "SOP_Mountain_Altar",
+      "is_bypassed": false,
+      "params": {
+        "frequency": 1.35,
+        "phase": 0.2,
+        "octaves": 3,
+        "roughness": 0.45,
+        "use_cuda": true
+      },
+      "inputs": {
+        "Amplitude": 0.65
+      },
+      "x": -270.0,
+      "y": -260.0
+    },
+    {
+      "id": "smooth_floor",
+      "type": "SOP_Smooth",
+      "name": "SOP_Smooth_Altar",
+      "is_bypassed": false,
+      "params": {
+        "iterations": 3,
+        "strength": 0.55
+      },
+      "inputs": {},
+      "x": -20.0,
+      "y": -260.0
+    },
+    {
+      "id": "uv_floor",
+      "type": "SOP_UVProject",
+      "name": "SOP_UVProject_Floor",
+      "is_bypassed": false,
+      "params": {
+        "projection": "Planar XZ (Top)",
+        "scale_u": 2.0,
+        "scale_v": 2.0,
+        "offset_u": 0.0,
+        "offset_v": 0.0
+      },
+      "inputs": {},
+      "x": 230.0,
+      "y": -260.0
+    },
+    {
+      "id": "vop_checker",
+      "type": "VOP_UVChecker",
+      "name": "VOP_UVChecker_Altar",
+      "is_bypassed": false,
+      "params": {
+        "tiles_u": 10.0,
+        "tiles_v": 10.0,
+        "color_a": [0.14, 0.16, 0.24],
+        "color_b": [0.28, 0.34, 0.48],
+        "mix_amount": 0.85
+      },
+      "inputs": {},
+      "x": -20.0,
+      "y": -100.0
+    },
+    {
+      "id": "vop_dither_floor",
+      "type": "VOP_BayerDither",
+      "name": "VOP_BayerDither_Altar",
+      "is_bypassed": false,
+      "params": {
+        "strength": 0.08
+      },
+      "inputs": {},
+      "x": 230.0,
+      "y": -100.0
+    },
+    {
+      "id": "mat_floor",
+      "type": "SOP_Material",
+      "name": "SOP_Material_AltarFloor",
+      "is_bypassed": false,
+      "params": {
+        "group": "",
+        "material_label": "mat_altar_checker"
+      },
+      "inputs": {},
+      "x": 490.0,
+      "y": -200.0
+    },
+    {
+      "id": "curve_helix",
+      "type": "SOP_Curve",
+      "name": "SOP_Curve_HelixSpine",
+      "is_bypassed": false,
+      "params": {
+        "curve_type": "Helix Spiral",
+        "num_points": 64,
+        "radius": 1.65,
+        "height": 3.4,
+        "turns": 2.75
+      },
+      "inputs": {},
+      "x": -270.0,
+      "y": 120.0
+    },
+    {
+      "id": "sweep_tendril",
+      "type": "SOP_Sweep",
+      "name": "SOP_Sweep_ArcaneTendril",
+      "is_bypassed": false,
+      "params": {
+        "radius": 0.28,
+        "taper_end": 0.18,
+        "cols": 14,
+        "twist_deg": 540.0
+      },
+      "inputs": {},
+      "x": -20.0,
+      "y": 120.0
+    },
+    {
+      "id": "vop_noise",
+      "type": "VOP_SimplexNoise3D",
+      "name": "VOP_SimplexNoise3D_Arcane",
+      "is_bypassed": false,
+      "params": {
+        "coord_space": "World Position",
+        "frequency": 2.4,
+        "octaves": 4,
+        "lacunarity": 2.02,
+        "gain": 0.5,
+        "color_a": [0.08, 0.14, 0.36],
+        "color_b": [0.22, 0.92, 0.84],
+        "mix_amount": 0.88
+      },
+      "inputs": {},
+      "x": -20.0,
+      "y": 280.0
+    },
+    {
+      "id": "vop_rim",
+      "type": "VOP_RimLight",
+      "name": "VOP_RimLight_Tendril",
+      "is_bypassed": false,
+      "params": {
+        "rim_power": 2.6,
+        "rim_intensity": 1.85,
+        "rim_color": [0.45, 0.96, 1.0]
+      },
+      "inputs": {},
+      "x": 230.0,
+      "y": 280.0
+    },
+    {
+      "id": "mat_tendril",
+      "type": "SOP_Material",
+      "name": "SOP_Material_Tendril",
+      "is_bypassed": false,
+      "params": {
+        "group": "",
+        "material_label": "mat_arcane_tendril"
+      },
+      "inputs": {},
+      "x": 490.0,
+      "y": 160.0
+    },
+    {
+      "id": "merge_all",
+      "type": "SOP_Merge",
+      "name": "SOP_Merge_AltarScene",
+      "is_bypassed": false,
+      "params": {},
+      "inputs": {},
+      "x": 760.0,
+      "y": -20.0
+    }
+  ],
+  "links": [
+    {
+      "id": "l1",
+      "source_node": "grid_floor",
+      "source_pin": "Geo",
+      "target_node": "mtn_floor",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "l2",
+      "source_node": "mtn_floor",
+      "source_pin": "Geo",
+      "target_node": "smooth_floor",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "l3",
+      "source_node": "smooth_floor",
+      "source_pin": "Geo",
+      "target_node": "uv_floor",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "l4",
+      "source_node": "vop_checker",
+      "source_pin": "Shader",
+      "target_node": "vop_dither_floor",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "l5",
+      "source_node": "uv_floor",
+      "source_pin": "Geo",
+      "target_node": "mat_floor",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "l6",
+      "source_node": "vop_dither_floor",
+      "source_pin": "Shader",
+      "target_node": "mat_floor",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "l7",
+      "source_node": "curve_helix",
+      "source_pin": "Geo",
+      "target_node": "sweep_tendril",
+      "target_pin": "Backbone"
+    },
+    {
+      "id": "l8",
+      "source_node": "vop_noise",
+      "source_pin": "Shader",
+      "target_node": "vop_rim",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "l9",
+      "source_node": "sweep_tendril",
+      "source_pin": "Geo",
+      "target_node": "mat_tendril",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "l10",
+      "source_node": "vop_rim",
+      "source_pin": "Shader",
+      "target_node": "mat_tendril",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "l11",
+      "source_node": "mat_floor",
+      "source_pin": "Geo",
+      "target_node": "merge_all",
+      "target_pin": "Geo1"
+    },
+    {
+      "id": "l12",
+      "source_node": "mat_tendril",
+      "source_pin": "Geo",
+      "target_node": "merge_all",
+      "target_pin": "Geo2"
+    }
+  ],
+  "display_sop_id": "merge_all",
+  "template_sop_id": null,
+  "display_vop_id": "vop_rim"
+}

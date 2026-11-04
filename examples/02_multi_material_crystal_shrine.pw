@@ -1,0 +1,257 @@
+{
+  "name": "02_Multi_Material_Crystal_Shrine",
+  "version": "0.3.0",
+  "nodes": [
+    {
+      "id": "grid_base",
+      "type": "SOP_Grid",
+      "name": "SOP_Grid_Terrain",
+      "is_bypassed": false,
+      "params": {
+        "size_x": 8.5,
+        "size_z": 8.5,
+        "rows": 52,
+        "cols": 52
+      },
+      "inputs": {},
+      "x": -480.0,
+      "y": -260.0
+    },
+    {
+      "id": "mtn_base",
+      "type": "SOP_Mountain",
+      "name": "SOP_Mountain_Terrain",
+      "is_bypassed": false,
+      "params": {
+        "frequency": 1.55,
+        "phase": 0.4,
+        "octaves": 3,
+        "roughness": 0.46,
+        "use_cuda": true
+      },
+      "inputs": {
+        "Amplitude": 1.15
+      },
+      "x": -210.0,
+      "y": -260.0
+    },
+    {
+      "id": "ramp_vop",
+      "type": "VOP_ColorRamp",
+      "name": "VOP_ElevationRamp",
+      "is_bypassed": false,
+      "params": {
+        "min_y": -0.9,
+        "max_y": 1.2,
+        "low_color": [0.11, 0.22, 0.36],
+        "high_color": [0.78, 0.62, 0.42]
+      },
+      "inputs": {},
+      "x": -480.0,
+      "y": -90.0
+    },
+    {
+      "id": "dither_vop",
+      "type": "VOP_BayerDither",
+      "name": "VOP_BayerDither_Terrain",
+      "is_bypassed": false,
+      "params": {
+        "strength": 0.1
+      },
+      "inputs": {},
+      "x": -210.0,
+      "y": -90.0
+    },
+    {
+      "id": "mat_terrain",
+      "type": "SOP_Material",
+      "name": "SOP_Material_Terrain",
+      "is_bypassed": false,
+      "params": {
+        "group": "",
+        "material_label": "mat_canyon_ground"
+      },
+      "inputs": {},
+      "x": 70.0,
+      "y": -210.0
+    },
+    {
+      "id": "scatter_pts",
+      "type": "SOP_Scatter",
+      "name": "SOP_Scatter_Crystals",
+      "is_bypassed": false,
+      "params": {
+        "num_points": 32,
+        "seed": 108
+      },
+      "inputs": {},
+      "x": -210.0,
+      "y": 90.0
+    },
+    {
+      "id": "rand_pscale",
+      "type": "SOP_AttributeRandomize",
+      "name": "SOP_Randomize_Scale",
+      "is_bypassed": false,
+      "params": {
+        "attribute": "pscale",
+        "dimensions": 1,
+        "min_value": 0.38,
+        "max_value": 0.95,
+        "seed": 77
+      },
+      "inputs": {},
+      "x": 50.0,
+      "y": 90.0
+    },
+    {
+      "id": "crystal_proto",
+      "type": "SOP_Cylinder",
+      "name": "SOP_Crystal_Pillar",
+      "is_bypassed": false,
+      "params": {
+        "radius": 0.22,
+        "height": 1.45,
+        "cols": 6,
+        "rows": 2
+      },
+      "inputs": {},
+      "x": 50.0,
+      "y": 240.0
+    },
+    {
+      "id": "copy_crystals",
+      "type": "SOP_CopyToPoints",
+      "name": "SOP_CopyToPoints_Crystals",
+      "is_bypassed": false,
+      "params": {
+        "master_scale": 1.0
+      },
+      "inputs": {},
+      "x": 310.0,
+      "y": 140.0
+    },
+    {
+      "id": "nwshader_bio",
+      "type": "VOP_NWShader",
+      "name": "VOP_NWShader_Biolum",
+      "is_bypassed": false,
+      "params": {},
+      "inputs": {},
+      "x": 310.0,
+      "y": 300.0
+    },
+    {
+      "id": "mat_crystals",
+      "type": "SOP_Material",
+      "name": "SOP_Material_Crystals",
+      "is_bypassed": false,
+      "params": {
+        "group": "",
+        "material_label": "mat_biolum_crystal"
+      },
+      "inputs": {},
+      "x": 570.0,
+      "y": 180.0
+    },
+    {
+      "id": "merge_shrine",
+      "type": "SOP_Merge",
+      "name": "SOP_Merge_Shrine",
+      "is_bypassed": false,
+      "params": {},
+      "inputs": {},
+      "x": 820.0,
+      "y": -20.0
+    }
+  ],
+  "links": [
+    {
+      "id": "l1",
+      "source_node": "grid_base",
+      "source_pin": "Geo",
+      "target_node": "mtn_base",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "l2",
+      "source_node": "ramp_vop",
+      "source_pin": "Shader",
+      "target_node": "dither_vop",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "l3",
+      "source_node": "mtn_base",
+      "source_pin": "Geo",
+      "target_node": "mat_terrain",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "l4",
+      "source_node": "dither_vop",
+      "source_pin": "Shader",
+      "target_node": "mat_terrain",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "l5",
+      "source_node": "mtn_base",
+      "source_pin": "Geo",
+      "target_node": "scatter_pts",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "l6",
+      "source_node": "scatter_pts",
+      "source_pin": "Geo",
+      "target_node": "rand_pscale",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "l7",
+      "source_node": "crystal_proto",
+      "source_pin": "Geo",
+      "target_node": "copy_crystals",
+      "target_pin": "Source"
+    },
+    {
+      "id": "l8",
+      "source_node": "rand_pscale",
+      "source_pin": "Geo",
+      "target_node": "copy_crystals",
+      "target_pin": "TargetPoints"
+    },
+    {
+      "id": "l9",
+      "source_node": "copy_crystals",
+      "source_pin": "Geo",
+      "target_node": "mat_crystals",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "l10",
+      "source_node": "nwshader_bio",
+      "source_pin": "Shader",
+      "target_node": "mat_crystals",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "l11",
+      "source_node": "mat_terrain",
+      "source_pin": "Geo",
+      "target_node": "merge_shrine",
+      "target_pin": "Geo1"
+    },
+    {
+      "id": "l12",
+      "source_node": "mat_crystals",
+      "source_pin": "Geo",
+      "target_node": "merge_shrine",
+      "target_pin": "Geo2"
+    }
+  ],
+  "display_sop_id": "merge_shrine",
+  "template_sop_id": null,
+  "display_vop_id": "dither_vop"
+}

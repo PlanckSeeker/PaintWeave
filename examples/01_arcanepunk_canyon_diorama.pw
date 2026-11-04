@@ -1,0 +1,132 @@
+{
+  "name": "01_Arcanepunk_Canyon_Diorama",
+  "version": "0.3.0",
+  "nodes": [
+    {
+      "id": "grid_1",
+      "type": "SOP_Grid",
+      "name": "SOP_Grid_1",
+      "is_bypassed": false,
+      "params": {
+        "size_x": 8.0,
+        "size_z": 8.0,
+        "rows": 56,
+        "cols": 56
+      },
+      "inputs": {},
+      "x": -340.0,
+      "y": -200.0
+    },
+    {
+      "id": "mountain_1",
+      "type": "SOP_Mountain",
+      "name": "SOP_Mountain_1",
+      "is_bypassed": false,
+      "params": {
+        "frequency": 1.75,
+        "phase": 0.0,
+        "octaves": 3,
+        "roughness": 0.48,
+        "use_cuda": true
+      },
+      "inputs": {
+        "Amplitude": 1.25
+      },
+      "x": -60.0,
+      "y": -200.0
+    },
+    {
+      "id": "isolight_1",
+      "type": "VOP_IsoLight",
+      "name": "VOP_IsoLight_1",
+      "is_bypassed": false,
+      "params": {
+        "intensity": 1.45
+      },
+      "inputs": {
+        "LightDir": [0.6, 0.85, 0.5],
+        "Ambient": 0.22
+      },
+      "x": -340.0,
+      "y": 60.0
+    },
+    {
+      "id": "rim_1",
+      "type": "VOP_RimLight",
+      "name": "VOP_RimLight_1",
+      "is_bypassed": false,
+      "params": {
+        "rim_intensity": 2.1,
+        "rim_color": [0.18, 0.92, 0.84]
+      },
+      "inputs": {},
+      "x": -60.0,
+      "y": 60.0
+    },
+    {
+      "id": "dither_1",
+      "type": "VOP_BayerDither",
+      "name": "VOP_BayerDither_1",
+      "is_bypassed": false,
+      "params": {
+        "strength": 0.12
+      },
+      "inputs": {},
+      "x": 200.0,
+      "y": 60.0
+    },
+    {
+      "id": "mat_1",
+      "type": "SOP_Material",
+      "name": "SOP_Material_1",
+      "is_bypassed": false,
+      "params": {
+        "group": "",
+        "material_label": "mat_canyon_arcanepunk"
+      },
+      "inputs": {},
+      "x": 240.0,
+      "y": -120.0
+    }
+  ],
+  "links": [
+    {
+      "id": "l1",
+      "source_node": "grid_1",
+      "source_pin": "Geo",
+      "target_node": "mountain_1",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "l2",
+      "source_node": "isolight_1",
+      "source_pin": "Shader",
+      "target_node": "rim_1",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "l3",
+      "source_node": "rim_1",
+      "source_pin": "Shader",
+      "target_node": "dither_1",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "l4",
+      "source_node": "mountain_1",
+      "source_pin": "Geo",
+      "target_node": "mat_1",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "l5",
+      "source_node": "dither_1",
+      "source_pin": "Shader",
+      "target_node": "mat_1",
+      "target_pin": "Shader"
+    }
+  ],
+  "display_sop_id": "mat_1",
+  "template_sop_id": null,
+  "display_vop_id": "dither_1"
+}

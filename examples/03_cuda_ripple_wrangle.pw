@@ -1,0 +1,104 @@
+{
+  "name": "03_CUDA_Ripple_Wrangle",
+  "version": "0.3.0",
+  "nodes": [
+    {
+      "id": "grid_w",
+      "type": "SOP_Grid",
+      "name": "SOP_Grid_Base",
+      "is_bypassed": false,
+      "params": {
+        "size_x": 7.5,
+        "size_z": 7.5,
+        "rows": 64,
+        "cols": 64
+      },
+      "inputs": {},
+      "x": -340.0,
+      "y": -120.0
+    },
+    {
+      "id": "wrangle_w",
+      "type": "SOP_Wrangle",
+      "name": "SOP_PointWrangle_Ripple",
+      "is_bypassed": false,
+      "params": {
+        "code": "# Available: P, N, Cd, uv, np, torch, num_points\nr = np.sqrt(P[:, 0]**2 + P[:, 2]**2)\nP[:, 1] = np.sin(r * 3.8) * np.exp(-r * 0.25) * 1.35\nt = (P[:, 1] + 0.8) / 1.8\nCd[:, 0] = np.clip(0.15 + 0.75 * t, 0.0, 1.0)\nCd[:, 1] = np.clip(0.45 + 0.45 * (1.0 - t), 0.0, 1.0)\nCd[:, 2] = 0.92\n"
+      },
+      "inputs": {},
+      "x": -50.0,
+      "y": -120.0
+    },
+    {
+      "id": "fresnel_w",
+      "type": "VOP_Fresnel",
+      "name": "VOP_Fresnel_Aura",
+      "is_bypassed": false,
+      "params": {
+        "exponent": 2.8,
+        "aura_color": [0.15, 0.92, 0.85]
+      },
+      "inputs": {},
+      "x": -340.0,
+      "y": 90.0
+    },
+    {
+      "id": "toon_w",
+      "type": "VOP_CelToon",
+      "name": "VOP_CelToon_Bands",
+      "is_bypassed": false,
+      "params": {
+        "bands": 5
+      },
+      "inputs": {},
+      "x": -50.0,
+      "y": 90.0
+    },
+    {
+      "id": "mat_w",
+      "type": "SOP_Material",
+      "name": "SOP_Material_Ripple",
+      "is_bypassed": false,
+      "params": {
+        "group": "",
+        "material_label": "mat_toon_ripple"
+      },
+      "inputs": {},
+      "x": 240.0,
+      "y": -20.0
+    }
+  ],
+  "links": [
+    {
+      "id": "l1",
+      "source_node": "grid_w",
+      "source_pin": "Geo",
+      "target_node": "wrangle_w",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "l2",
+      "source_node": "fresnel_w",
+      "source_pin": "Shader",
+      "target_node": "toon_w",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "l3",
+      "source_node": "wrangle_w",
+      "source_pin": "Geo",
+      "target_node": "mat_w",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "l4",
+      "source_node": "toon_w",
+      "source_pin": "Shader",
+      "target_node": "mat_w",
+      "target_pin": "Shader"
+    }
+  ],
+  "display_sop_id": "mat_w",
+  "template_sop_id": null,
+  "display_vop_id": "toon_w"
+}
