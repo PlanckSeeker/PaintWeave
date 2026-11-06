@@ -45,49 +45,138 @@ uniform float u_normal_threshold = 0.28;
 uniform vec4 u_outline_color = vec4(0.07, 0.08, 0.11, 1.0);
 uniform int u_outline_enabled = 1;
 
+uniform int u_kuwahara_enabled = 0;
+uniform int u_kuwahara_radius = 3;
+uniform int u_hatch_enabled = 0;
+uniform float u_hatch_scale = 6.0;
+uniform float u_hatch_strength = 0.65;
+uniform float u_paper_grain = 0.05;
+
 out vec4 frag_color;
 
-void main() {
-    vec4 base_color = texture(u_color_tex, v_uv);
-    if (u_outline_enabled == 0) {
-        frag_color = base_color;
-        return;
+vec4 apply_kuwahara(sampler2D tex, vec2 uv, vec2 texel, int R) {
+    vec3 m[4];
+    vec3 s[4];
+    for (int k = 0; k < 4; ++k) {
+        m[k] = vec3(0.0);
+        s[k] = vec3(0.0);
     }
+    float n = float((R + 1) * (R + 1));
 
-    vec2 offset = u_texel_size * u_outline_width;
-
-    // 3x3 Sobel edge detection on Normal (RGB) and Linear Depth (A)
-    float d_gx = 0.0;
-    float d_gy = 0.0;
-    vec3 n_gx = vec3(0.0);
-    vec3 n_gy = vec3(0.0);
-
-    for (int y = -1; y <= 1; ++y) {
-        for (int x = -1; x <= 1; ++x) {
-            vec2 sample_uv = v_uv + vec2(float(x), float(y)) * offset;
-            vec4 nd = texture(u_normal_depth_tex, sample_uv);
-            vec3 n = nd.rgb * 2.0 - 1.0;
-            float d = nd.a;
-
-            float kx = (x != 0 && y == 0) ? float(x) * 2.0 : float(x);
-            float ky = (y != 0 && x == 0) ? float(y) * 2.0 : float(y);
-
-            d_gx += d * kx;
-            d_gy += d * ky;
-            n_gx += n * kx;
-            n_gy += n * ky;
+    // Quadrant 0: [-R, 0] x [-R, 0]
+    for (int j = -R; j <= 0; ++j) {
+        for (int i = -R; i <= 0; ++i) {
+            vec3 c = texture(tex, uv + vec2(float(i), float(j)) * texel).rgb;
+            m[0] += c;
+            s[0] += c * c;
+        }
+    }
+    // Quadrant 1: [0, R] x [-R, 0]
+    for (int j = -R; j <= 0; ++j) {
+        for (int i = 0; i <= R; ++i) {
+            vec3 c = texture(tex, uv + vec2(float(i), float(j)) * texel).rgb;
+            m[1] += c;
+            s[1] += c * c;
+        }
+    }
+    // Quadrant 2: [-R, 0] x [0, R]
+    for (int j = 0; j <= R; ++j) {
+        for (int i = -R; i <= 0; ++i) {
+            vec3 c = texture(tex, uv + vec2(float(i), float(j)) * texel).rgb;
+            m[2] += c;
+            s[2] += c * c;
+        }
+    }
+    // Quadrant 3: [0, R] x [0, R]
+    for (int j = 0; j <= R; ++j) {
+        for (int i = 0; i <= R; ++i) {
+            vec3 c = texture(tex, uv + vec2(float(i), float(j)) * texel).rgb;
+            m[3] += c;
+            s[3] += c * c;
         }
     }
 
-    float depth_edge = sqrt(d_gx * d_gx + d_gy * d_gy);
-    float norm_edge = length(n_gx) + length(n_gy);
+    float min_sigma2 = 1e8;
+    vec3 result = texture(tex, uv).rgb;
+    for (int k = 0; k < 4; ++k) {
+        m[k] /= n;
+        s[k] = abs(s[k] / n - m[k] * m[k]);
+        float sigma2 = s[k].r + s[k].g + s[k].b;
+        if (sigma2 < min_sigma2) {
+            min_sigma2 = sigma2;
+            result = m[k];
+        }
+    }
+    return vec4(result, 1.0);
+}
 
-    float is_edge = 0.0;
-    if (depth_edge > u_depth_threshold || norm_edge > u_normal_threshold) {
-        is_edge = 1.0;
+void main() {
+    vec4 base_color = texture(u_color_tex, v_uv);
+
+    // 1. Optional Anisotropic Painterly Kuwahara Filter
+    if (u_kuwahara_enabled != 0 && u_kuwahara_radius > 0) {
+        base_color = apply_kuwahara(u_color_tex, v_uv, u_texel_size, clamp(u_kuwahara_radius, 1, 5));
     }
 
-    frag_color = mix(base_color, u_outline_color, is_edge * u_outline_color.a);
+    // 2. 3x3 Sobel Edge Detection on Normal & Linear Depth
+    float is_edge = 0.0;
+    if (u_outline_enabled != 0) {
+        vec2 offset = u_texel_size * u_outline_width;
+        float d_gx = 0.0;
+        float d_gy = 0.0;
+        vec3 n_gx = vec3(0.0);
+        vec3 n_gy = vec3(0.0);
+
+        for (int y = -1; y <= 1; ++y) {
+            for (int x = -1; x <= 1; ++x) {
+                vec2 sample_uv = v_uv + vec2(float(x), float(y)) * offset;
+                vec4 nd = texture(u_normal_depth_tex, sample_uv);
+                vec3 n = nd.rgb * 2.0 - 1.0;
+                float d = nd.a;
+
+                float kx = (x != 0 && y == 0) ? float(x) * 2.0 : float(x);
+                float ky = (y != 0 && x == 0) ? float(y) * 2.0 : float(y);
+
+                d_gx += d * kx;
+                d_gy += d * ky;
+                n_gx += n * kx;
+                n_gy += n * ky;
+            }
+        }
+
+        float depth_edge = sqrt(d_gx * d_gx + d_gy * d_gy);
+        float norm_edge = length(n_gx) + length(n_gy);
+
+        if (depth_edge > u_depth_threshold || norm_edge > u_normal_threshold) {
+            is_edge = 1.0;
+        }
+    }
+
+    vec4 shaded = mix(base_color, u_outline_color, is_edge * u_outline_color.a);
+
+    // 3. Screen-Space Pen-and-Ink Crosshatching in Shadow Penumbras
+    if (u_hatch_enabled != 0) {
+        vec2 p = gl_FragCoord.xy;
+        float lum = dot(shaded.rgb, vec3(0.299, 0.587, 0.114));
+        float h1 = clamp((sin((p.x + p.y) * (3.14159 / u_hatch_scale)) + 0.3) * 2.2, 0.0, 1.0);
+        float h2 = clamp((sin((p.x - p.y) * (3.14159 / u_hatch_scale)) + 0.3) * 2.2, 0.0, 1.0);
+        float h3 = clamp((sin((p.y * 1.414 + p.x * 0.35) * (3.14159 / u_hatch_scale)) + 0.3) * 2.2, 0.0, 1.0);
+
+        float hatch = 1.0;
+        hatch = mix(hatch, min(hatch, h1), smoothstep(0.60, 0.38, lum));
+        hatch = mix(hatch, min(hatch, h2), smoothstep(0.38, 0.22, lum));
+        hatch = mix(hatch, min(hatch, h3), smoothstep(0.22, 0.08, lum));
+
+        shaded.rgb *= mix(1.0, hatch, u_hatch_strength);
+    }
+
+    // 4. Subtle Parchment / Paper Fiber Grain
+    if (u_paper_grain > 0.001) {
+        float grain = (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * u_paper_grain;
+        shaded.rgb += vec3(grain);
+    }
+
+    frag_color = shaded;
 }
 """
 
@@ -151,6 +240,14 @@ class FrameCompositor:
         self.depth_threshold: float = 0.0025
         self.normal_threshold: float = 0.28
         self.outline_color: tuple[float, float, float, float] = (0.07, 0.08, 0.11, 1.0)
+
+        # Painterly Kuwahara & Screen-Space Crosshatch Options
+        self.kuwahara_enabled: bool = False
+        self.kuwahara_radius: int = 3
+        self.hatch_enabled: bool = False
+        self.hatch_scale: float = 6.0
+        self.hatch_strength: float = 0.65
+        self.paper_grain: float = 0.05
 
     def resize(self, width: int, height: int) -> None:
         w = max(width, 1)
@@ -263,6 +360,18 @@ class FrameCompositor:
             prog["u_outline_color"].value = self.outline_color
         if "u_outline_enabled" in prog:
             prog["u_outline_enabled"].value = 1 if self.outlines_enabled else 0
+        if "u_kuwahara_enabled" in prog:
+            prog["u_kuwahara_enabled"].value = 1 if self.kuwahara_enabled else 0
+        if "u_kuwahara_radius" in prog:
+            prog["u_kuwahara_radius"].value = int(self.kuwahara_radius)
+        if "u_hatch_enabled" in prog:
+            prog["u_hatch_enabled"].value = 1 if self.hatch_enabled else 0
+        if "u_hatch_scale" in prog:
+            prog["u_hatch_scale"].value = float(self.hatch_scale)
+        if "u_hatch_strength" in prog:
+            prog["u_hatch_strength"].value = float(self.hatch_strength)
+        if "u_paper_grain" in prog:
+            prog["u_paper_grain"].value = float(self.paper_grain)
 
         self.quad_vao.render(moderngl.TRIANGLES)
         self.ctx.enable(moderngl.DEPTH_TEST)

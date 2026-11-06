@@ -211,6 +211,12 @@ class Geometry:
         with open(filepath, "w", encoding="utf-8") as f:
             f.writelines(lines)
 
+    def export_to_glb(self, filepath: str) -> int:
+        """Export geometry and multi-material primitive batches to binary glTF 2.0 (.glb)."""
+        from paintweave.engine.io.gltf import export_glb
+
+        return export_glb(self, filepath)
+
     @classmethod
     def load_from_obj(cls, filepath: str) -> Geometry:
         """Load a Wavefront .obj file into a columnar Geometry instance (supports negative indices & seam UVs)."""

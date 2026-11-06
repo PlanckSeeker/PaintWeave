@@ -17,10 +17,12 @@ from paintweave.nodes.sop.instancing import (
 )
 from paintweave.nodes.sop.material import MaterialSOPNode
 from paintweave.nodes.sop.modifiers import (
+    BevelSOPNode,
     ExtrudeSOPNode,
     FacetSOPNode,
     MountainSOPNode,
     NormalSOPNode,
+    PolyReduceSOPNode,
     RaycastSOPNode,
     SmoothSOPNode,
     StylizedDamageSOPNode,
@@ -56,6 +58,8 @@ def register_sop_nodes() -> None:
     NodeRegistry.register("SOP_Sweep", SweepSOPNode)
     NodeRegistry.register("SOP_Raycast", RaycastSOPNode)
     NodeRegistry.register("SOP_StylizedDamage", StylizedDamageSOPNode)
+    NodeRegistry.register("SOP_Bevel", BevelSOPNode)
+    NodeRegistry.register("SOP_PolyReduce", PolyReduceSOPNode)
 
     NodeRegistry.register("SOP_Group", GroupSOPNode)
     NodeRegistry.register("SOP_Color", ColorSOPNode)

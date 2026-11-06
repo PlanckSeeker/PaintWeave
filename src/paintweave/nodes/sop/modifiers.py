@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import heapq
+
 import numpy as np
 from scipy.spatial import cKDTree
 
@@ -997,4 +999,438 @@ class StylizedDamageSOPNode(NodeBase):
             cd = cd * (1.0 - damage_mask[:, None]) + dmg_col * damage_mask[:, None]
             out_geo.set_point_attrib("Cd", np.clip(cd, 0.0, 1.0).astype(np.float32))
 
+        self.outputs["Geo"].value = out_geo
+
+
+class BevelSOPNode(NodeBase):
+    """Procedurally chamfers/bevels sharp dihedral edges across polygonal and triangular meshes."""
+
+    context = NodeContext.SOP
+    category = "Modifiers"
+    title = "Bevel"
+
+    INPUT_PORTS = [
+        PortSpec("Geo", DataType.GEOMETRY, None, "Geometry to bevel."),
+    ]
+    OUTPUT_PORTS = [
+        PortSpec("Geo", DataType.GEOMETRY, None, "Beveled geometry with chamfered edges."),
+    ]
+    PARAM_SPECS = [
+        ParamSpec(
+            "offset",
+            "float",
+            0.08,
+            label="Bevel Offset",
+            min_val=0.001,
+            max_val=5.0,
+            step=0.01,
+            unit="m",
+            description="Distance to inset sharp edges for chamfering.",
+        ),
+        ParamSpec(
+            "angle_threshold",
+            "float",
+            30.0,
+            label="Angle Threshold",
+            min_val=0.0,
+            max_val=180.0,
+            step=1.0,
+            unit="deg",
+            description="Minimum dihedral angle between adjacent triangles to bevel.",
+        ),
+        ParamSpec(
+            "divisions",
+            "int",
+            1,
+            label="Divisions",
+            min_val=1,
+            max_val=4,
+            step=1,
+            description="Number of bevel chamfer segments (1 = flat chamfer).",
+        ),
+        ParamSpec(
+            "chamfer_tint",
+            "bool",
+            False,
+            label="Tint Chamfers",
+            description="Apply a distinct vertex color to newly generated bevel chamfers.",
+        ),
+        ParamSpec(
+            "chamfer_color",
+            "color",
+            (0.95, 0.88, 0.72),
+            label="Chamfer Color",
+            description="Color applied to chamfered edges if Tint Chamfers is active.",
+        ),
+    ]
+
+    def cook(self) -> None:
+        in_geo: Geometry | None = self.inputs["Geo"].value
+        if in_geo is None or in_geo.num_primitives == 0 or in_geo.num_points < 3:
+            self.outputs["Geo"].value = in_geo.clone() if in_geo is not None else Geometry()
+            return
+
+        offset = float(self.params.get("offset", 0.08))
+        angle_thresh = float(self.params.get("angle_threshold", 30.0))
+        divisions = max(1, int(self.params.get("divisions", 1)))
+        chamfer_tint = bool(self.params.get("chamfer_tint", False))
+        chamfer_col = np.array(self.params.get("chamfer_color", (0.95, 0.88, 0.72)), dtype=np.float32)
+
+        P = in_geo.points["P"]
+        T = in_geo.primitives["triangles"]
+        n_pts = len(P)
+        n_tris = len(T)
+
+        v0 = P[T[:, 0]]
+        v1 = P[T[:, 1]]
+        v2 = P[T[:, 2]]
+        fn = np.cross(v1 - v0, v2 - v0)
+        fn_len = np.linalg.norm(fn, axis=1, keepdims=True)
+        fn_len[fn_len < 1e-8] = 1.0
+        fn = fn / fn_len
+
+        edge_map: dict[tuple[int, int], list[tuple[int, int]]] = {}
+        for t_idx in range(n_tris):
+            tri = T[t_idx]
+            for e in range(3):
+                u, v = int(tri[e]), int(tri[(e + 1) % 3])
+                ekey = (min(u, v), max(u, v))
+                if ekey not in edge_map:
+                    edge_map[ekey] = []
+                edge_map[ekey].append((t_idx, e))
+
+        sharp_edges: set[tuple[int, int]] = set()
+        thresh_rad = np.radians(angle_thresh)
+        cos_thresh = float(np.cos(thresh_rad))
+        for ekey, adj in edge_map.items():
+            if len(adj) == 2:
+                tA, _ = adj[0]
+                tB, _ = adj[1]
+                dot = float(np.clip(np.dot(fn[tA], fn[tB]), -1.0, 1.0))
+                if dot < cos_thresh:
+                    sharp_edges.add(ekey)
+            elif len(adj) == 1:
+                sharp_edges.add(ekey)
+
+        if not sharp_edges or offset <= 1e-5:
+            self.outputs["Geo"].value = in_geo.clone()
+            return
+
+        has_cd = "Cd" in in_geo.points and in_geo.points["Cd"].shape[0] == n_pts
+        orig_cd = in_geo.points["Cd"] if has_cd else np.full((n_pts, 3), 0.72, dtype=np.float32)
+
+        has_uv = "uv" in in_geo.points and in_geo.points["uv"].shape[0] == n_pts
+        orig_uv = in_geo.points["uv"] if has_uv else np.zeros((n_pts, 2), dtype=np.float32)
+
+        has_mat = "material_id" in in_geo.primitives and in_geo.primitives["material_id"].shape[0] == n_tris
+        orig_mat = in_geo.primitives["material_id"] if has_mat else np.zeros(n_tris, dtype=np.int32)
+
+        new_points: list[np.ndarray] = []
+        new_cds: list[np.ndarray] = []
+        new_uvs: list[np.ndarray] = []
+        tri_inset_pts = np.zeros((n_tris, 3), dtype=np.int32)
+
+        in_edges = [2, 0, 1]
+        out_edges = [0, 1, 2]
+
+        for t_idx in range(n_tris):
+            tri = T[t_idx]
+            f_norm = fn[t_idx]
+            pts = P[tri]
+            edges = [pts[1] - pts[0], pts[2] - pts[1], pts[0] - pts[2]]
+            in_norms: list[np.ndarray] = []
+            is_sharp: list[bool] = []
+
+            for e in range(3):
+                u, v = int(tri[e]), int(tri[(e + 1) % 3])
+                ekey = (min(u, v), max(u, v))
+                sharp = ekey in sharp_edges
+                is_sharp.append(sharp)
+                el = float(np.linalg.norm(edges[e]))
+                if el > 1e-8:
+                    in_norms.append(np.cross(f_norm, edges[e]) / el)
+                else:
+                    in_norms.append(np.zeros(3, dtype=np.float32))
+
+            for vi in range(3):
+                e_in = in_edges[vi]
+                e_out = out_edges[vi]
+                shift = np.zeros(3, dtype=np.float32)
+                c = 0
+                if is_sharp[e_in]:
+                    shift += in_norms[e_in] * offset
+                    c += 1
+                if is_sharp[e_out]:
+                    shift += in_norms[e_out] * offset
+                    c += 1
+                pos = pts[vi] + shift if c > 0 else pts[vi]
+                idx = len(new_points)
+                new_points.append(pos.astype(np.float32))
+                new_cds.append(orig_cd[tri[vi]])
+                new_uvs.append(orig_uv[tri[vi]])
+                tri_inset_pts[t_idx, vi] = idx
+
+        new_triangles: list[list[int]] = []
+        new_mat_ids: list[int] = []
+
+        # 1. Inset main triangles
+        for t_idx in range(n_tris):
+            new_triangles.append(tri_inset_pts[t_idx].tolist())
+            new_mat_ids.append(int(orig_mat[t_idx]))
+
+        # 2. Bevel chamfer strips along sharp edges
+        for ekey in sharp_edges:
+            adj = edge_map[ekey]
+            if len(adj) == 2:
+                (tA, eA), (tB, eB) = adj[0], adj[1]
+                uA_idx = int(tri_inset_pts[tA, eA])
+                vA_idx = int(tri_inset_pts[tA, (eA + 1) % 3])
+
+                orig_v = int(T[tA, (eA + 1) % 3])
+                if int(T[tB, eB]) == orig_v:
+                    vB_idx = int(tri_inset_pts[tB, eB])
+                    uB_idx = int(tri_inset_pts[tB, (eB + 1) % 3])
+                else:
+                    uB_idx = int(tri_inset_pts[tB, eB])
+                    vB_idx = int(tri_inset_pts[tB, (eB + 1) % 3])
+
+                mat_id = int(orig_mat[tA])
+
+                if divisions == 1:
+                    new_triangles.append([uA_idx, vA_idx, vB_idx])
+                    new_triangles.append([uA_idx, vB_idx, uB_idx])
+                    new_mat_ids.extend([mat_id, mat_id])
+                else:
+                    p_uA, p_uB = new_points[uA_idx], new_points[uB_idx]
+                    p_vA, p_vB = new_points[vA_idx], new_points[vB_idx]
+                    prev_u = uA_idx
+                    prev_v = vA_idx
+                    for d_step in range(1, divisions):
+                        frac = float(d_step) / float(divisions)
+                        p_u_mid = (1.0 - frac) * p_uA + frac * p_uB
+                        p_v_mid = (1.0 - frac) * p_vA + frac * p_vB
+                        mid_u_idx = len(new_points)
+                        new_points.append(p_u_mid.astype(np.float32))
+                        new_cds.append(chamfer_col if chamfer_tint else new_cds[uA_idx])
+                        new_uvs.append(new_uvs[uA_idx])
+                        mid_v_idx = len(new_points)
+                        new_points.append(p_v_mid.astype(np.float32))
+                        new_cds.append(chamfer_col if chamfer_tint else new_cds[vA_idx])
+                        new_uvs.append(new_uvs[vA_idx])
+
+                        new_triangles.append([prev_u, prev_v, mid_v_idx])
+                        new_triangles.append([prev_u, mid_v_idx, mid_u_idx])
+                        new_mat_ids.extend([mat_id, mat_id])
+                        prev_u = mid_u_idx
+                        prev_v = mid_v_idx
+
+                    new_triangles.append([prev_u, prev_v, vB_idx])
+                    new_triangles.append([prev_u, vB_idx, uB_idx])
+                    new_mat_ids.extend([mat_id, mat_id])
+
+        out_geo = Geometry()
+        out_geo.set_point_attrib("P", np.array(new_points, dtype=np.float32))
+        out_geo.set_point_attrib("Cd", np.array(new_cds, dtype=np.float32))
+        out_geo.set_point_attrib("uv", np.array(new_uvs, dtype=np.float32))
+        out_geo.primitives["triangles"] = np.array(new_triangles, dtype=np.uint32)
+        out_geo.primitives["material_id"] = np.array(new_mat_ids, dtype=np.int32)
+        out_geo.detail = in_geo.detail.copy()
+        out_geo.compute_vertex_normals()
+        self.outputs["Geo"].value = out_geo
+
+
+class PolyReduceSOPNode(NodeBase):
+    """Fast Quadric Error Metric (QEM) decimation for stylized low-poly retopology."""
+
+    context = NodeContext.SOP
+    category = "Modifiers"
+    title = "PolyReduce"
+
+    INPUT_PORTS = [
+        PortSpec("Geo", DataType.GEOMETRY, None, "Geometry to decimate."),
+    ]
+    OUTPUT_PORTS = [
+        PortSpec("Geo", DataType.GEOMETRY, None, "Decimated geometry."),
+    ]
+    PARAM_SPECS = [
+        ParamSpec(
+            "target_percent",
+            "float",
+            50.0,
+            label="Target %",
+            min_val=1.0,
+            max_val=100.0,
+            step=5.0,
+            unit="%",
+            description="Percentage of original triangles to retain.",
+        ),
+        ParamSpec(
+            "target_count",
+            "int",
+            0,
+            label="Target Tri Count",
+            min_val=0,
+            max_val=100000,
+            step=10,
+            description="Explicit target triangle count (0 = use percentage).",
+        ),
+        ParamSpec(
+            "preserve_materials",
+            "bool",
+            True,
+            label="Preserve Materials",
+            description="Prevent edge collapse across boundaries between different materials.",
+        ),
+    ]
+
+    def cook(self) -> None:
+        in_geo: Geometry | None = self.inputs["Geo"].value
+        if in_geo is None or in_geo.num_primitives == 0 or in_geo.num_points < 4:
+            self.outputs["Geo"].value = in_geo.clone() if in_geo is not None else Geometry()
+            return
+
+        target_pct = float(self.params.get("target_percent", 50.0))
+        target_cnt = int(self.params.get("target_count", 0))
+        preserve_mats = bool(self.params.get("preserve_materials", True))
+
+        P = in_geo.points["P"].astype(np.float64)
+        T = in_geo.primitives["triangles"]
+        n_pts = len(P)
+        n_tris = len(T)
+
+        target = target_cnt if target_cnt > 0 else max(4, int(n_tris * (target_pct / 100.0)))
+        if target >= n_tris:
+            self.outputs["Geo"].value = in_geo.clone()
+            return
+
+        has_cd = "Cd" in in_geo.points and in_geo.points["Cd"].shape[0] == n_pts
+        cd_data = in_geo.points["Cd"].copy() if has_cd else np.full((n_pts, 3), 0.72, dtype=np.float32)
+
+        has_uv = "uv" in in_geo.points and in_geo.points["uv"].shape[0] == n_pts
+        uv_data = in_geo.points["uv"].copy() if has_uv else np.zeros((n_pts, 2), dtype=np.float32)
+
+        has_mat = "material_id" in in_geo.primitives and in_geo.primitives["material_id"].shape[0] == n_tris
+        mat_data = in_geo.primitives["material_id"].copy() if has_mat else np.zeros(n_tris, dtype=np.int32)
+
+        # 1. Compute vertex Quadrics Q_v
+        v0 = P[T[:, 0]]
+        v1 = P[T[:, 1]]
+        v2 = P[T[:, 2]]
+        fn = np.cross(v1 - v0, v2 - v0)
+        fn_len = np.linalg.norm(fn, axis=1, keepdims=True)
+        fn_len[fn_len < 1e-8] = 1.0
+        fn = fn / fn_len
+        d = -np.sum(fn * v0, axis=1, keepdims=True)
+        planes = np.hstack([fn, d])
+
+        quadrics = np.zeros((n_pts, 4, 4), dtype=np.float64)
+        for t_idx in range(n_tris):
+            p = planes[t_idx : t_idx + 1].T
+            Kp = p @ p.T
+            for vi in T[t_idx]:
+                quadrics[vi] += Kp
+
+        parent = list(range(n_pts))
+        pos = P.copy()
+
+        def find(i: int) -> int:
+            path = []
+            while parent[i] != i:
+                path.append(i)
+                i = parent[i]
+            for node in path:
+                parent[node] = i
+            return i
+
+        # 2. Build unique edges and candidate collapse costs
+        edges = set()
+        for tri in T:
+            for i in range(3):
+                u, v = int(tri[i]), int(tri[(i + 1) % 3])
+                if u != v:
+                    edges.add((min(u, v), max(u, v)))
+
+        heap = []
+        for u, v in edges:
+            p_mid = 0.5 * (pos[u] + pos[v])
+            v_h = np.append(p_mid, 1.0)
+            Q = quadrics[u] + quadrics[v]
+            cost = float(v_h @ Q @ v_h)
+            heapq.heappush(heap, (cost, u, v, p_mid))
+
+        valid_tris = np.ones(n_tris, dtype=bool)
+        vert_to_tri: list[set[int]] = [set() for _ in range(n_pts)]
+        for t_idx, tri in enumerate(T):
+            for vi in tri:
+                vert_to_tri[int(vi)].add(t_idx)
+
+        active_tri_count = n_tris
+
+        while heap and active_tri_count > target:
+            cost, u, v, p_target = heapq.heappop(heap)
+            root_u = find(u)
+            root_v = find(v)
+            if root_u == root_v:
+                continue
+
+            u_tris = [t for t in vert_to_tri[root_u] if valid_tris[t]]
+            v_tris = [t for t in vert_to_tri[root_v] if valid_tris[t]]
+            common_tris = set(u_tris).intersection(v_tris)
+
+            # Check material preservation
+            if preserve_mats and has_mat:
+                mats_u = {mat_data[t] for t in u_tris}
+                mats_v = {mat_data[t] for t in v_tris}
+                if mats_u != mats_v:
+                    continue
+
+            # Collapse root_u into root_v
+            parent[root_u] = root_v
+            pos[root_v] = p_target
+            quadrics[root_v] += quadrics[root_u]
+            cd_data[root_v] = 0.5 * (cd_data[root_u] + cd_data[root_v])
+            uv_data[root_v] = 0.5 * (uv_data[root_u] + uv_data[root_v])
+
+            for t in common_tris:
+                valid_tris[t] = False
+                active_tri_count -= 1
+
+            for t in u_tris:
+                if valid_tris[t]:
+                    vert_to_tri[root_v].add(t)
+
+        # 3. Reconstruct surviving triangles and re-index
+        rem_tris: list[list[int]] = []
+        rem_mats: list[int] = []
+        for t_idx in range(n_tris):
+            if valid_tris[t_idx]:
+                tri = [find(int(T[t_idx, 0])), find(int(T[t_idx, 1])), find(int(T[t_idx, 2]))]
+                if tri[0] != tri[1] and tri[1] != tri[2] and tri[0] != tri[2]:
+                    rem_tris.append(tri)
+                    rem_mats.append(int(mat_data[t_idx]))
+
+        if not rem_tris:
+            self.outputs["Geo"].value = in_geo.clone()
+            return
+
+        rem_tris_arr = np.array(rem_tris, dtype=np.uint32)
+        used_verts = np.unique(rem_tris_arr)
+        new_idx_map = {int(old): int(new) for new, old in enumerate(used_verts)}
+        final_P = pos[used_verts].astype(np.float32)
+        final_Cd = cd_data[used_verts].astype(np.float32)
+        final_uv = uv_data[used_verts].astype(np.float32)
+
+        lookup = np.zeros(n_pts, dtype=np.uint32)
+        for old_idx, new_idx in new_idx_map.items():
+            lookup[old_idx] = new_idx
+        final_T = lookup[rem_tris_arr]
+
+        out_geo = Geometry()
+        out_geo.set_point_attrib("P", final_P)
+        out_geo.set_point_attrib("Cd", final_Cd)
+        out_geo.set_point_attrib("uv", final_uv)
+        out_geo.primitives["triangles"] = final_T
+        out_geo.primitives["material_id"] = np.array(rem_mats, dtype=np.int32)
+        out_geo.detail = in_geo.detail.copy()
+        out_geo.compute_vertex_normals()
         self.outputs["Geo"].value = out_geo

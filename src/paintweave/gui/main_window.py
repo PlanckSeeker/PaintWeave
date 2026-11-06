@@ -200,6 +200,11 @@ class PaintWeaveMainWindow(QMainWindow):
         act_export_obj.triggered.connect(self.export_mesh_obj)
         file_menu.addAction(act_export_obj)
 
+        act_export_glb = QAction("Export glTF 2.0 / GLB (.glb)...", self)
+        act_export_glb.setIconText("Export GLB")
+        act_export_glb.triggered.connect(self.export_mesh_glb)
+        file_menu.addAction(act_export_glb)
+
         act_render_png = QAction("📸 Render Viewport to Image (.png)... (F12)", self)
         act_render_png.setIconText("📸 Render")
         act_render_png.setShortcut(QKeySequence("F12"))
@@ -782,6 +787,37 @@ class PaintWeaveMainWindow(QMainWindow):
             )
         except Exception as exc:
             QMessageBox.warning(self, "OBJ Export Error", str(exc))
+
+    def export_mesh_glb(self) -> None:
+        graph = self.canvas_ctrl.core_graph
+        sop_node = graph.cook_display_sop()
+        if not sop_node or "Geo" not in sop_node.outputs:
+            self.status_bar.showMessage("No active Display SOP geometry to export.")
+            return
+
+        geo = sop_node.outputs["Geo"].value
+        if geo is None or geo.num_primitives == 0:
+            self.status_bar.showMessage("Display geometry is empty.")
+            return
+
+        filepath, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Display Mesh as Binary glTF 2.0 (GLB)",
+            "paintweave_model.glb",
+            "glTF 2.0 Binary (*.glb);;All Files (*)",
+        )
+        if not filepath:
+            return
+        if not filepath.endswith(".glb"):
+            filepath += ".glb"
+
+        try:
+            bytes_written = geo.export_to_glb(filepath)
+            self.status_bar.showMessage(
+                f"Exported glTF 2.0 ({geo.num_primitives:,} tris, {bytes_written:,} bytes) to {filepath}"
+            )
+        except Exception as exc:
+            QMessageBox.warning(self, "GLB Export Error", str(exc))
 
     def export_render_png(self) -> None:
         filepath, _ = QFileDialog.getSaveFileName(

@@ -153,6 +153,20 @@ class Viewport3D(QOpenGLWidget):
         self.btn_outline.setToolTip("Toggle screen-space stylized ink outlines (Pass 3)")
         self.btn_outline.toggled.connect(self._on_toggle_outlines)
 
+        self.btn_kuwahara = QPushButton("🎨 Paint (K)")
+        self.btn_kuwahara.setCheckable(True)
+        self.btn_kuwahara.setChecked(False)
+        self.btn_kuwahara.setFixedHeight(24)
+        self.btn_kuwahara.setToolTip("Toggle Anisotropic Kuwahara painterly brushstroke clustering")
+        self.btn_kuwahara.toggled.connect(self._on_toggle_kuwahara)
+
+        self.btn_hatch = QPushButton("✏️ Hatch (H)")
+        self.btn_hatch.setCheckable(True)
+        self.btn_hatch.setChecked(False)
+        self.btn_hatch.setFixedHeight(24)
+        self.btn_hatch.setToolTip("Toggle screen-space pen-and-ink shadow crosshatching")
+        self.btn_hatch.toggled.connect(self._on_toggle_hatch)
+
         self.btn_normals = QPushButton("📏 @N")
         self.btn_normals.setCheckable(True)
         self.btn_normals.setFixedHeight(24)
@@ -177,6 +191,8 @@ class Viewport3D(QOpenGLWidget):
         hbox.addWidget(self.btn_grid)
         hbox.addWidget(self.btn_shadow)
         hbox.addWidget(self.btn_outline)
+        hbox.addWidget(self.btn_kuwahara)
+        hbox.addWidget(self.btn_hatch)
         hbox.addWidget(self.btn_normals)
         hbox.addWidget(btn_frame)
         hbox.addWidget(btn_reset)
@@ -207,6 +223,16 @@ class Viewport3D(QOpenGLWidget):
     def _on_toggle_outlines(self, checked: bool) -> None:
         if self.compositor is not None:
             self.compositor.outlines_enabled = checked
+        self.update()
+
+    def _on_toggle_kuwahara(self, checked: bool) -> None:
+        if self.compositor is not None:
+            self.compositor.kuwahara_enabled = checked
+        self.update()
+
+    def _on_toggle_hatch(self, checked: bool) -> None:
+        if self.compositor is not None:
+            self.compositor.hatch_enabled = checked
         self.update()
 
     def _on_toggle_normals(self, checked: bool) -> None:
@@ -290,10 +316,16 @@ class Viewport3D(QOpenGLWidget):
         elif event.key() == Qt.Key.Key_O:
             self.btn_outline.setChecked(not self.btn_outline.isChecked())
             event.accept()
+        elif event.key() == Qt.Key.Key_K:
+            self.btn_kuwahara.setChecked(not self.btn_kuwahara.isChecked())
+            event.accept()
+        elif event.key() == Qt.Key.Key_H:
+            self.btn_hatch.setChecked(not self.btn_hatch.isChecked())
+            event.accept()
         elif event.key() == Qt.Key.Key_N:
             self.btn_normals.setChecked(not self.show_normals)
             event.accept()
-        elif event.key() in (Qt.Key.Key_F, Qt.Key.Key_H):
+        elif event.key() == Qt.Key.Key_F:
             self.frame_active_geometry()
             event.accept()
         else:
