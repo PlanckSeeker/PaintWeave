@@ -62,6 +62,19 @@ class IsometricCamera:
     def rotate_roll(self, delta_deg: float) -> None:
         self.roll_deg = (self.roll_deg + delta_deg) % 360.0
 
+    def get_camera_position(self) -> tuple[float, float, float]:
+        """Return world-space (x, y, z) eye coordinates of the camera."""
+        pitch_rad = glm.radians(self.pitch_deg)
+        yaw_rad = glm.radians(self.yaw_deg)
+        dist = max(0.5, self.zoom * 2.6) if self.perspective else 20.0
+        eye_offset = glm.vec3(
+            dist * math.cos(pitch_rad) * math.sin(yaw_rad),
+            dist * math.sin(pitch_rad),
+            dist * math.cos(pitch_rad) * math.cos(yaw_rad),
+        )
+        cam_pos = eye_offset + self.target
+        return (float(cam_pos.x), float(cam_pos.y), float(cam_pos.z))
+
     def get_mvp_matrix(self) -> glm.mat4:
         aspect_safe = max(self.aspect, 0.01)
         pitch_rad = glm.radians(self.pitch_deg)

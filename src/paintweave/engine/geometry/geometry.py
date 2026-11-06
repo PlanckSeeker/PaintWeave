@@ -140,8 +140,6 @@ class Geometry:
                         pt_mask[tris[:, 0]] | pt_mask[tris[:, 1]] | pt_mask[tris[:, 2]]
                     )
                 mat_arr[prim_mask] = mat_id
-            else:
-                mat_arr[:] = mat_id
 
         self.primitives["material_id"] = mat_arr
         return mat_id
@@ -215,12 +213,18 @@ class Geometry:
 
     @classmethod
     def load_from_obj(cls, filepath: str) -> Geometry:
-        """Load a Wavefront .obj file into a columnar Geometry instance."""
+        """Load a Wavefront .obj file into a columnar Geometry instance (supports negative indices & seam UVs)."""
         geo = cls()
         verts: list[list[float]] = []
         uvs: list[list[float]] = []
         norms: list[list[float]] = []
         faces: list[list[int]] = []
+        corner_vt_pairs: list[tuple[int, int]] = []
+        corner_vn_pairs: list[tuple[int, int]] = []
+
+        def _resolve_idx(raw_token: str, current_len: int) -> int:
+            idx = int(raw_token)
+            return (current_len + idx) if idx < 0 else (idx - 1)
 
         with open(filepath, encoding="utf-8") as f:
             for line in f:
@@ -231,41 +235,75 @@ class Geometry:
                     verts.append([float(parts[1]), float(parts[2]), float(parts[3])])
                 elif parts[0] == "vt" and len(parts) >= 3:
                     uvs.append([float(parts[1]), float(parts[2])])
-                elif parts[0] == "vn":
+                elif parts[0] == "vn" and len(parts) >= 4:
                     norms.append([float(parts[1]), float(parts[2]), float(parts[3])])
                 elif parts[0] == "f":
-                    face_indices = []
+                    face_indices: list[int] = []
                     for p in parts[1:]:
                         sub = p.split("/")
-                        face_indices.append(int(sub[0]) - 1)
+                        v_idx = _resolve_idx(sub[0], len(verts))
+                        face_indices.append(v_idx)
+                        if len(sub) >= 2 and sub[1]:
+                            vt_idx = _resolve_idx(sub[1], len(uvs))
+                            corner_vt_pairs.append((v_idx, vt_idx))
+                        if len(sub) >= 3 and sub[2]:
+                            vn_idx = _resolve_idx(sub[2], len(norms))
+                            corner_vn_pairs.append((v_idx, vn_idx))
                     for i in range(1, len(face_indices) - 1):
                         faces.append(
                             [face_indices[0], face_indices[i], face_indices[i + 1]]
                         )
 
-        if verts:
+        n_verts = len(verts)
+        if n_verts > 0:
             p_arr = np.array(verts, dtype=np.float32)
             geo.set_point_attrib("P", p_arr)
             geo.set_point_attrib(
                 "Cd",
                 np.tile(
-                    np.array([[0.72, 0.76, 0.82]], dtype=np.float32), (len(verts), 1)
+                    np.array([[0.72, 0.76, 0.82]], dtype=np.float32), (n_verts, 1)
                 ),
             )
-            if uvs and len(uvs) == len(verts):
-                geo.set_point_attrib("uv", np.array(uvs, dtype=np.float32))
-            else:
-                geo.set_point_attrib("uv", np.zeros((len(verts), 2), dtype=np.float32))
-        if norms and len(norms) == len(verts):
-            geo.set_point_attrib("N", np.array(norms, dtype=np.float32))
-        elif verts:
-            n_arr = np.zeros((len(verts), 3), dtype=np.float32)
-            n_arr[:, 1] = 1.0
-            geo.set_point_attrib("N", n_arr)
+
+            uv_arr = np.zeros((n_verts, 2), dtype=np.float32)
+            if uvs:
+                raw_uvs = np.array(uvs, dtype=np.float32)
+                if len(uvs) == n_verts:
+                    uv_arr = raw_uvs.copy()
+                for v_i, vt_i in corner_vt_pairs:
+                    if 0 <= v_i < n_verts and 0 <= vt_i < len(uvs):
+                        uv_arr[v_i] = raw_uvs[vt_i]
+            geo.set_point_attrib("uv", uv_arr)
+
+            has_valid_normals = False
+            if norms:
+                raw_norms = np.array(norms, dtype=np.float32)
+                if len(norms) == n_verts and not corner_vn_pairs:
+                    geo.set_point_attrib("N", raw_norms)
+                    has_valid_normals = True
+                elif corner_vn_pairs:
+                    n_accum = np.zeros((n_verts, 3), dtype=np.float32)
+                    for v_i, vn_i in corner_vn_pairs:
+                        if 0 <= v_i < n_verts and 0 <= vn_i < len(norms):
+                            n_accum[v_i] += raw_norms[vn_i]
+                    lengths = np.linalg.norm(n_accum, axis=1, keepdims=True)
+                    if np.any(lengths > 1e-8):
+                        n_arr = np.where(
+                            lengths > 1e-8,
+                            n_accum / np.where(lengths > 1e-8, lengths, 1.0),
+                            np.array([[0.0, 1.0, 0.0]], dtype=np.float32),
+                        )
+                        geo.set_point_attrib("N", n_arr.astype(np.float32))
+                        has_valid_normals = True
+
+            if not has_valid_normals:
+                n_arr = np.zeros((n_verts, 3), dtype=np.float32)
+                n_arr[:, 1] = 1.0
+                geo.set_point_attrib("N", n_arr)
 
         if faces:
             geo.set_triangles(np.array(faces, dtype=np.uint32))
-            if not norms or len(norms) != len(verts):
+            if not norms:
                 geo.compute_vertex_normals()
 
         return geo

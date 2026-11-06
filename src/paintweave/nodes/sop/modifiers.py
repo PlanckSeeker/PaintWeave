@@ -339,8 +339,8 @@ class ExtrudeSOPNode(NodeBase):
         edges = np.vstack([e0, e1, e2])
         edge_mats = np.concatenate([base_mat_ids, base_mat_ids, base_mat_ids])
 
-        sorted_edges = np.sort(edges, axis=1)
-        max_vtx = num_base_pts + 1
+        sorted_edges = np.sort(edges, axis=1).astype(np.int64)
+        max_vtx = int(num_base_pts) + 1
         undirected_hash = sorted_edges[:, 0] * max_vtx + sorted_edges[:, 1]
         unq, counts = np.unique(undirected_hash, return_counts=True)
 
@@ -889,5 +889,112 @@ class RaycastSOPNode(NodeBase):
             out_geo.set_point_attrib("N", tgt_n.astype(np.float32))
         elif out_geo.num_primitives > 0:
             out_geo.compute_vertex_normals()
+
+        self.outputs["Geo"].value = out_geo
+
+
+class StylizedDamageSOPNode(NodeBase):
+    """
+    Procedurally carves chunky triangular notches, chipped corners, and chisel dents into geometry edges,
+    mimicking the hand-carved stone monoliths and weathered wood props of Hearthstone, Dofus, and Arcane.
+    """
+
+    context = NodeContext.SOP
+    category = "Modifiers"
+    title = "Stylized Damage (Chunky Notches)"
+
+    INPUT_PORTS = [
+        PortSpec("Geo", DataType.GEOMETRY, None, "Geometry to chisel and chip."),
+    ]
+    OUTPUT_PORTS = [
+        PortSpec("Geo", DataType.GEOMETRY, None, "Chipped and chiseled geometry with @damaged mask."),
+    ]
+    PARAM_SPECS = [
+        ParamSpec("seed", "int", 42, label="Random Seed", min_val=0, max_val=9999),
+        ParamSpec("chip_count", "int", 6, label="Chip Count", min_val=1, max_val=48),
+        ParamSpec("chip_radius", "float", 0.45, label="Chip Radius", min_val=0.05, max_val=3.0, step=0.05),
+        ParamSpec("chip_depth", "float", 0.22, label="Chip Depth", min_val=0.01, max_val=2.0, step=0.02),
+        ParamSpec("angularity", "float", 1.6, label="Angularity / Bevel Falloff", min_val=0.5, max_val=4.0, step=0.1),
+        ParamSpec(
+            "tint_damage",
+            "bool",
+            True,
+            label="Tint Raw Chipped Core",
+            description="Colors chipped gouges with freshly exposed core stone/wood pigment.",
+        ),
+        ParamSpec("damage_color", "vec3", (0.88, 0.84, 0.78), label="Exposed Core Color"),
+    ]
+
+    def evaluate(self) -> None:
+        in_geo: Geometry | None = self.inputs["Geo"].get_data()
+        if in_geo is None or in_geo.num_points == 0:
+            self.outputs["Geo"].value = Geometry()
+            return
+
+        out_geo = in_geo.clone()
+        p = in_geo.points["P"].copy()
+        n_pts = p.shape[0]
+
+        seed = int(self.get_param("seed"))
+        chip_count = max(1, int(self.get_param("chip_count")))
+        chip_radius = max(0.01, float(self.get_param("chip_radius")))
+        chip_depth = max(0.001, float(self.get_param("chip_depth")))
+        angularity = max(0.1, float(self.get_param("angularity")))
+        tint_damage = bool(self.get_param("tint_damage"))
+        dmg_col = np.array(self.get_param("damage_color"), dtype=np.float32)
+
+        rng = np.random.default_rng(seed)
+
+        if "N" in in_geo.points and in_geo.points["N"].shape == p.shape:
+            normals = in_geo.points["N"].copy()
+        else:
+            normals = np.zeros_like(p)
+            normals[:, 1] = 1.0
+
+        tree = cKDTree(p)
+        damage_mask = np.zeros(n_pts, dtype=np.float32)
+
+        # Candidate selection: pick from exterior/corner points preferentially
+        center = np.mean(p, axis=0)
+        dist_from_center = np.linalg.norm(p - center, axis=1)
+        weights = dist_from_center / (np.sum(dist_from_center) + 1e-6)
+        num_candidates = min(chip_count, n_pts)
+        chosen_indices = rng.choice(n_pts, size=num_candidates, replace=False, p=weights)
+
+        for c_idx in chosen_indices:
+            c_pos = p[c_idx]
+            c_norm = normals[c_idx]
+            r = chip_radius * float(rng.uniform(0.65, 1.35))
+            d_amt = chip_depth * float(rng.uniform(0.7, 1.4))
+
+            # Find local neighborhood within chip radius
+            neighbor_indices = tree.query_ball_point(c_pos, r)
+            if not neighbor_indices:
+                continue
+
+            sub_p = p[neighbor_indices]
+            dists = np.linalg.norm(sub_p - c_pos, axis=1)
+            falloff = np.power(np.maximum(1.0 - (dists / r), 0.0), angularity)
+
+            # Inward chisel displacement (opposite normal)
+            inward_dir = -c_norm
+            p[neighbor_indices] += inward_dir * (falloff[:, None] * d_amt)
+            damage_mask[neighbor_indices] = np.maximum(damage_mask[neighbor_indices], falloff)
+
+        out_geo.set_point_attrib("P", p.astype(np.float32))
+        out_geo.set_point_attrib("damaged", damage_mask.astype(np.float32))
+
+        # Recompute surface normals for affected geometry
+        if out_geo.num_primitives > 0:
+            out_geo.compute_vertex_normals()
+
+        if tint_damage:
+            if "Cd" in in_geo.points and in_geo.points["Cd"].shape[0] == n_pts:
+                cd = in_geo.points["Cd"].copy()
+            else:
+                cd = np.full((n_pts, 3), 0.72, dtype=np.float32)
+
+            cd = cd * (1.0 - damage_mask[:, None]) + dmg_col * damage_mask[:, None]
+            out_geo.set_point_attrib("Cd", np.clip(cd, 0.0, 1.0).astype(np.float32))
 
         self.outputs["Geo"].value = out_geo

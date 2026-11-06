@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from paintweave.core.base_node import NodeBase
 from paintweave.core.datatypes import NodeContext
+
+_TRAILING_DIGITS_RE = re.compile(r"_(\d+)$")
 
 
 @dataclass(frozen=True)
@@ -66,8 +69,13 @@ class NodeRegistry:
     def create_node(cls, node_type: str, custom_name: str | None = None) -> NodeBase:
         """Instantiate a node with a unique sequential name."""
         reg = cls.get_registration(node_type)
-        cls._node_counter[node_type] = cls._node_counter.get(node_type, 0) + 1
-        instance_name = custom_name or f"{node_type}_{cls._node_counter[node_type]}"
+        cur_count = cls._node_counter.get(node_type, 0) + 1
+        if custom_name:
+            m = _TRAILING_DIGITS_RE.search(custom_name)
+            if m:
+                cur_count = max(cur_count, int(m.group(1)))
+        cls._node_counter[node_type] = cur_count
+        instance_name = custom_name or f"{node_type}_{cur_count}"
         node = reg.node_cls(instance_name)
         node.registry_type = node_type
         return node

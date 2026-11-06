@@ -14,6 +14,7 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWi
 
 from paintweave.engine.geometry.geometry import Geometry
 from paintweave.engine.renderer.camera import IsometricCamera
+from paintweave.engine.renderer.compositor import FrameCompositor
 from paintweave.engine.renderer.mesh_buffer import GPUMeshBuffer
 from paintweave.engine.shader.payload import (
     DEFAULT_FRAGMENT_SHADER,
@@ -31,9 +32,11 @@ void main() {
 
 GRID_FRAGMENT_SHADER = """#version 330 core
 uniform vec4 u_line_color;
-out vec4 frag_color;
+layout(location = 0) out vec4 out_color;
+layout(location = 1) out vec4 out_normal_depth;
 void main() {
-    frag_color = u_line_color;
+    out_color = u_line_color;
+    out_normal_depth = vec4(0.0, 1.0, 0.0, gl_FragCoord.z);
 }
 """
 
@@ -50,9 +53,11 @@ void main() {
 
 AXIS_FRAGMENT_SHADER = """#version 330 core
 in vec3 v_color;
-out vec4 frag_color;
+layout(location = 0) out vec4 out_color;
+layout(location = 1) out vec4 out_normal_depth;
 void main() {
-    frag_color = vec4(v_color, 1.0);
+    out_color = vec4(v_color, 1.0);
+    out_normal_depth = vec4(0.5, 0.5, 0.5, gl_FragCoord.z);
 }
 """
 
@@ -82,6 +87,7 @@ class Viewport3D(QOpenGLWidget):
         self.normals_vbo: moderngl.Buffer | None = None
         self.normals_vao: moderngl.VertexArray | None = None
         self.normals_vertex_count: int = 0
+        self.compositor: FrameCompositor | None = None
 
         self.camera: IsometricCamera = IsometricCamera(zoom=3.4)
         self._pending_geo: Geometry | None = None
@@ -137,6 +143,20 @@ class Viewport3D(QOpenGLWidget):
         self.btn_grid.setFixedHeight(24)
         self.btn_grid.toggled.connect(self._on_toggle_grid)
 
+        self.btn_shadow = QPushButton("🌑 Shadows")
+        self.btn_shadow.setCheckable(True)
+        self.btn_shadow.setChecked(True)
+        self.btn_shadow.setFixedHeight(24)
+        self.btn_shadow.setToolTip("Toggle real-time directional shadow mapping (Pass 1)")
+        self.btn_shadow.toggled.connect(self._on_toggle_shadows)
+
+        self.btn_outline = QPushButton("✒️ Outlines (O)")
+        self.btn_outline.setCheckable(True)
+        self.btn_outline.setChecked(True)
+        self.btn_outline.setFixedHeight(24)
+        self.btn_outline.setToolTip("Toggle screen-space stylized ink outlines (Pass 3)")
+        self.btn_outline.toggled.connect(self._on_toggle_outlines)
+
         self.btn_normals = QPushButton("📏 Normals (N)")
         self.btn_normals.setCheckable(True)
         self.btn_normals.setFixedHeight(24)
@@ -159,6 +179,8 @@ class Viewport3D(QOpenGLWidget):
         hbox.addWidget(self.btn_proj)
         hbox.addWidget(self.btn_wire)
         hbox.addWidget(self.btn_grid)
+        hbox.addWidget(self.btn_shadow)
+        hbox.addWidget(self.btn_outline)
         hbox.addWidget(self.btn_normals)
         hbox.addWidget(btn_frame)
         hbox.addWidget(btn_reset)
@@ -181,6 +203,16 @@ class Viewport3D(QOpenGLWidget):
         self.show_grid = checked
         self.update()
 
+    def _on_toggle_shadows(self, checked: bool) -> None:
+        if self.compositor is not None:
+            self.compositor.shadows_enabled = checked
+        self.update()
+
+    def _on_toggle_outlines(self, checked: bool) -> None:
+        if self.compositor is not None:
+            self.compositor.outlines_enabled = checked
+        self.update()
+
     def _on_toggle_normals(self, checked: bool) -> None:
         self.show_normals = checked
         self.update()
@@ -196,6 +228,14 @@ class Viewport3D(QOpenGLWidget):
                 self._pending_geo.detail["bounds_max"],
             )
             self.update()
+
+    def has_animated_shaders(self) -> bool:
+        """Return True if any active material batch or fallback shader program references the TIME uniform."""
+        if self.mesh_buffer is not None:
+            for batch in self.mesh_buffer.batches:
+                if "TIME" in batch.program:
+                    return True
+        return self.program is not None and "TIME" in self.program
 
     def mousePressEvent(self, event) -> None:  # type: ignore[override]
         if event.button() in (
@@ -251,6 +291,9 @@ class Viewport3D(QOpenGLWidget):
         elif event.key() == Qt.Key.Key_W:
             self.btn_wire.setChecked(not self.wireframe_enabled)
             event.accept()
+        elif event.key() == Qt.Key.Key_O:
+            self.btn_outline.setChecked(not self.btn_outline.isChecked())
+            event.accept()
         elif event.key() == Qt.Key.Key_N:
             self.btn_normals.setChecked(not self.show_normals)
             event.accept()
@@ -268,6 +311,8 @@ class Viewport3D(QOpenGLWidget):
 
         self.ctx.enable(moderngl.DEPTH_TEST | moderngl.BLEND)
         self.ctx.blend_func = moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA
+
+        self.compositor = FrameCompositor(self.ctx)
 
         self.program = self.ctx.program(
             vertex_shader=DEFAULT_VERTEX_SHADER,
@@ -292,13 +337,14 @@ class Viewport3D(QOpenGLWidget):
         if self._pending_shader is not None:
             self._compile_default_shader(self._pending_shader)
 
+        depth_prog = self.compositor.shadow_prog if self.compositor else None
         if (
             self._pending_geo is not None
             and self.mesh_buffer is not None
             and self.program is not None
         ):
             self.mesh_buffer.upload(
-                self._pending_geo, self.program, self._pending_shader
+                self._pending_geo, self.program, self._pending_shader, depth_program=depth_prog
             )
 
         if (
@@ -307,7 +353,7 @@ class Viewport3D(QOpenGLWidget):
             and self.grid_program is not None
         ):
             self.template_buffer.upload(
-                self._pending_template_geo, self.grid_program, None
+                self._pending_template_geo, self.grid_program, None, depth_program=depth_prog
             )
 
     def _init_grid_buffer(self) -> None:
@@ -373,6 +419,8 @@ class Viewport3D(QOpenGLWidget):
         if self.ctx:
             self.ctx.viewport = (0, 0, max(w, 1), max(h, 1))
             self.camera.aspect = max(w, 1) / float(max(h, 1))
+            if self.compositor is not None:
+                self.compositor.resize(max(w, 1), max(h, 1))
 
     def update_scene(
         self,
@@ -399,15 +447,18 @@ class Viewport3D(QOpenGLWidget):
             else:
                 self._reset_to_studio_shader()
 
+            depth_prog = self.compositor.shadow_prog if self.compositor else None
             if self.mesh_buffer is not None and self.program is not None:
                 batch_errors = self.mesh_buffer.upload(
-                    geo, self.program, fallback_shader
+                    geo, self.program, fallback_shader, depth_program=depth_prog
                 )
                 if batch_errors:
                     self.shader_error.emit(batch_errors[0])
 
             if self.template_buffer is not None and self.grid_program is not None:
-                self.template_buffer.upload(template_geo, self.grid_program, None)
+                self.template_buffer.upload(
+                    template_geo, self.grid_program, None, depth_program=depth_prog
+                )
 
             self._upload_normals_buffer(geo)
             self.doneCurrent()
@@ -489,16 +540,44 @@ class Viewport3D(QOpenGLWidget):
         w = int(self.width() * dpr)
         h = int(self.height() * dpr)
 
-        fbo = self.ctx.detect_framebuffer()
-        fbo.use()
+        # 0. Capture Qt screen framebuffer object upfront before offscreen passes rebind FBOs
+        screen_fbo = self.ctx.detect_framebuffer()
 
-        self.ctx.viewport = (0, 0, w, h)
-        self.ctx.clear(0.055, 0.065, 0.088, 1.0)
+        bounds_min = (
+            self._pending_geo.detail.get("bounds_min")
+            if self._pending_geo
+            else None
+        )
+        bounds_max = (
+            self._pending_geo.detail.get("bounds_max")
+            if self._pending_geo
+            else None
+        )
+        lsm = (
+            self.compositor.get_light_space_matrix(bounds_min, bounds_max)
+            if self.compositor
+            else glm.mat4(1.0)
+        )
+        lsm_bytes = lsm.to_bytes()
 
         mvp_mat = self.camera.get_mvp_matrix()
         mvp_bytes = mvp_mat.to_bytes()
         model_bytes = glm.mat4(1.0).to_bytes()
+        cam_pos = self.camera.get_camera_position()
         now_t = time.perf_counter() % 10000.0
+
+        # PASS 1: Directional Shadow Map (2048x2048 Depth FBO)
+        if self.compositor is not None and self.compositor.shadows_enabled:
+            self.compositor.begin_shadow_pass()
+            self.mesh_buffer.render_depth(lsm_bytes, model_bytes)
+
+        # PASS 2: Scene Geometry + G-Buffer MRT Pass (Offscreen MRT FBO)
+        if self.compositor is not None:
+            self.compositor.begin_geometry_pass(w, h)
+        else:
+            screen_fbo.use()
+            self.ctx.viewport = (0, 0, w, h)
+            self.ctx.clear(0.055, 0.065, 0.088, 1.0)
 
         # 1. Ground Grid & World Origin Axes
         if self.show_grid:
@@ -515,12 +594,29 @@ class Viewport3D(QOpenGLWidget):
                 self.axis_vao.render(moderngl.LINES)
 
         # 2. Render Active SOP Mesh (Multi-Material Batches or Wireframe)
+        shadow_active = (
+            self.compositor.shadows_enabled if self.compositor else False
+        )
         if self.wireframe_enabled:
             self.ctx.wireframe = True
-            self.mesh_buffer.render(mvp_bytes, model_bytes, now_t)
+            self.mesh_buffer.render(
+                mvp_bytes,
+                model_bytes,
+                now_t,
+                cam_pos,
+                light_space_bytes=lsm_bytes,
+                shadow_enabled=shadow_active,
+            )
             self.ctx.wireframe = False
         else:
-            self.mesh_buffer.render(mvp_bytes, model_bytes, now_t)
+            self.mesh_buffer.render(
+                mvp_bytes,
+                model_bytes,
+                now_t,
+                cam_pos,
+                light_space_bytes=lsm_bytes,
+                shadow_enabled=shadow_active,
+            )
 
         # 3. Render Pink Template / Ghost Reference SOP Wireframe if active
         if (
@@ -531,7 +627,14 @@ class Viewport3D(QOpenGLWidget):
             self.ctx.wireframe = True
             if "u_line_color" in self.grid_program:
                 self.grid_program["u_line_color"].value = (0.95, 0.28, 0.62, 0.55)
-            self.template_buffer.render(mvp_bytes, model_bytes, now_t)
+            self.template_buffer.render(
+                mvp_bytes,
+                model_bytes,
+                now_t,
+                cam_pos,
+                light_space_bytes=lsm_bytes,
+                shadow_enabled=False,
+            )
             self.ctx.wireframe = False
 
         # 3b. Render Point Normal (@N) Hair Vectors if enabled
@@ -547,24 +650,35 @@ class Viewport3D(QOpenGLWidget):
                 self.grid_program["u_line_color"].value = (0.22, 0.88, 0.98, 0.85)
             self.normals_vao.render(moderngl.LINES)
 
+        # PASS 3: Screen-Space Stylized Outline & Composite Pass (Target Screen FBO)
+        if self.compositor is not None:
+            self.compositor.composite_to_target(screen_fbo, w, h)
+
         # 4. Bottom-Right Corner Orientation Gizmo Pass
         gizmo_size = int(96 * dpr)
         margin = int(14 * dpr)
-        self.ctx.viewport = (w - gizmo_size - margin, margin, gizmo_size, gizmo_size)
+        if w > gizmo_size + 2 * margin and h > gizmo_size + 2 * margin:
+            screen_fbo.use()
+            self.ctx.viewport = (
+                w - gizmo_size - margin,
+                margin,
+                gizmo_size,
+                gizmo_size,
+            )
 
-        self.ctx.disable(moderngl.DEPTH_TEST)
-        gizmo_cam = IsometricCamera(zoom=2.0, aspect=1.0)
-        gizmo_cam.pitch_deg = self.camera.pitch_deg
-        gizmo_cam.yaw_deg = self.camera.yaw_deg
+            self.ctx.disable(moderngl.DEPTH_TEST)
+            gizmo_cam = IsometricCamera(zoom=2.0, aspect=1.0)
+            gizmo_cam.pitch_deg = self.camera.pitch_deg
+            gizmo_cam.yaw_deg = self.camera.yaw_deg
 
-        gizmo_mat = gizmo_cam.get_mvp_matrix()
-        if self.gizmo_vao is not None and self.axis_program is not None:
-            if "u_mvp" in self.axis_program:
-                self.axis_program["u_mvp"].write(gizmo_mat.to_bytes())
-            self.gizmo_vao.render(moderngl.LINES)
+            gizmo_mat = gizmo_cam.get_mvp_matrix()
+            if self.gizmo_vao is not None and self.axis_program is not None:
+                if "u_mvp" in self.axis_program:
+                    self.axis_program["u_mvp"].write(gizmo_mat.to_bytes())
+                self.gizmo_vao.render(moderngl.LINES)
 
-        self.ctx.enable(moderngl.DEPTH_TEST)
-        self.ctx.viewport = (0, 0, w, h)
+            self.ctx.enable(moderngl.DEPTH_TEST)
+            self.ctx.viewport = (0, 0, w, h)
 
     def render_to_image(
         self,
@@ -583,15 +697,41 @@ class Viewport3D(QOpenGLWidget):
         fbo = self.ctx.simple_framebuffer((width, height), components=4)
         prev_aspect = self.camera.aspect
         try:
-            fbo.use()
-            self.ctx.viewport = (0, 0, width, height)
-            self.ctx.enable(moderngl.DEPTH_TEST | moderngl.BLEND)
-            self.ctx.clear(0.055, 0.065, 0.088, 1.0)
-
             self.camera.aspect = width / float(max(height, 1))
             mvp_bytes = self.camera.get_mvp_matrix().to_bytes()
             model_bytes = glm.mat4(1.0).to_bytes()
+            cam_pos = self.camera.get_camera_position()
             now_t = time.perf_counter() % 10000.0
+
+            bounds_min = (
+                self._pending_geo.detail.get("bounds_min")
+                if self._pending_geo
+                else None
+            )
+            bounds_max = (
+                self._pending_geo.detail.get("bounds_max")
+                if self._pending_geo
+                else None
+            )
+            lsm = (
+                self.compositor.get_light_space_matrix(bounds_min, bounds_max)
+                if self.compositor
+                else glm.mat4(1.0)
+            )
+            lsm_bytes = lsm.to_bytes()
+
+            # PASS 1: Shadow Pass
+            if self.compositor is not None and self.compositor.shadows_enabled:
+                self.compositor.begin_shadow_pass()
+                self.mesh_buffer.render_depth(lsm_bytes, model_bytes)
+
+            # PASS 2: Geometry MRT Pass
+            if self.compositor is not None:
+                self.compositor.begin_geometry_pass(width, height)
+            else:
+                fbo.use()
+                self.ctx.viewport = (0, 0, width, height)
+                self.ctx.clear(0.055, 0.065, 0.088, 1.0)
 
             if include_grid and self.grid_vao is not None and self.grid_program is not None:
                 if "u_mvp" in self.grid_program:
@@ -600,7 +740,21 @@ class Viewport3D(QOpenGLWidget):
                     self.grid_program["u_line_color"].value = (0.18, 0.22, 0.30, 0.65)
                 self.grid_vao.render(moderngl.LINES)
 
-            self.mesh_buffer.render(mvp_bytes, model_bytes, now_t)
+            shadow_active = (
+                self.compositor.shadows_enabled if self.compositor else False
+            )
+            self.mesh_buffer.render(
+                mvp_bytes,
+                model_bytes,
+                now_t,
+                cam_pos,
+                light_space_bytes=lsm_bytes,
+                shadow_enabled=shadow_active,
+            )
+
+            # PASS 3: Composite Pass directly into export FBO
+            if self.compositor is not None:
+                self.compositor.composite_to_target(fbo, width, height)
 
             raw_bytes = fbo.read(components=4)
             img = Image.frombytes("RGBA", (width, height), raw_bytes)

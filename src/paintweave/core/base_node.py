@@ -7,6 +7,8 @@ import time
 import uuid
 from typing import Any, ClassVar
 
+import numpy as np
+
 from paintweave.core.datatypes import (
     CodeString,
     DataType,
@@ -144,7 +146,13 @@ class NodeBase:
     def set_param(self, name: str, value: Any) -> None:
         """Update a parameter or unconnected input pin and propagate dirty flags downstream."""
         if name in self.params:
-            if self.params[name] != value:
+            old_val = self.params[name]
+            changed = (
+                not np.array_equal(old_val, value)
+                if isinstance(old_val, np.ndarray) or isinstance(value, np.ndarray)
+                else old_val != value
+            )
+            if changed:
                 self.params[name] = value
                 self.mark_dirty()
         elif name in self.inputs:

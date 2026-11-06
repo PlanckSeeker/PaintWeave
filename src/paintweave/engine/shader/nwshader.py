@@ -51,7 +51,9 @@ in vec2 in_uv;
 
 uniform mat4 u_mvp;
 uniform mat4 u_model;
+uniform mat4 u_light_space_matrix = mat4(1.0);
 uniform float TIME;
+uniform vec3 u_camera_pos = vec3(11.5, 11.5, 11.5);
 
 {uniform_declarations}
 
@@ -60,6 +62,7 @@ out vec3 v_normal;
 out vec3 v_color;
 out vec2 v_uv;
 out vec3 v_view;
+out vec4 v_light_space_pos;
 
 {global_functions}
 
@@ -77,7 +80,8 @@ void main() {{
     v_normal = normalize(mat3(u_model) * NORMAL);
     v_color = COLOR;
     v_uv = UV;
-    v_view = normalize(-v_world_pos);
+    v_view = normalize(u_camera_pos - v_world_pos);
+    v_light_space_pos = u_light_space_matrix * world;
     gl_Position = u_mvp * world;
 }}
 """
@@ -88,14 +92,38 @@ in vec3 v_normal;
 in vec3 v_color;
 in vec2 v_uv;
 in vec3 v_view;
+in vec4 v_light_space_pos;
 
 uniform float TIME;
+uniform sampler2D u_shadow_map;
+uniform int u_shadow_enabled = 1;
 
 {uniform_declarations}
 
-out vec4 frag_color;
+layout(location = 0) out vec4 out_color;
+layout(location = 1) out vec4 out_normal_depth;
 
 {global_functions}
+
+float calc_shadow(vec4 light_space_pos, vec3 normal, vec3 light_dir) {{
+    if (u_shadow_enabled == 0) return 1.0;
+    vec3 proj_coords = light_space_pos.xyz / light_space_pos.w;
+    proj_coords = proj_coords * 0.5 + 0.5;
+    if (proj_coords.z > 1.0 || proj_coords.x < 0.0 || proj_coords.x > 1.0 || proj_coords.y < 0.0 || proj_coords.y > 1.0)
+        return 1.0;
+
+    float bias = max(0.003 * (1.0 - dot(normal, light_dir)), 0.0008);
+    float current_depth = proj_coords.z;
+    float shadow = 0.0;
+    vec2 texel_size = 1.0 / vec2(2048.0, 2048.0);
+    for(int x = -1; x <= 1; ++x) {{
+        for(int y = -1; y <= 1; ++y) {{
+            float pcf_depth = texture(u_shadow_map, proj_coords.xy + vec2(x, y) * texel_size).r;
+            shadow += (current_depth - bias > pcf_depth) ? 0.35 : 1.0;
+        }}
+    }}
+    return shadow / 9.0;
+}}
 
 void main() {{
     vec3 VERTEX = v_world_pos;
@@ -114,9 +142,11 @@ void main() {{
 
     vec3 L = normalize(vec3(0.6, 0.85, 0.5));
     float ndotl = max(dot(NORMAL, L), 0.15);
-    vec3 diffuse = ALBEDO * ndotl;
+    float s_factor = calc_shadow(v_light_space_pos, NORMAL, L);
+    vec3 diffuse = ALBEDO * ndotl * s_factor;
 
-    frag_color = vec4(diffuse + EMISSION, 1.0);
+    out_color = vec4(diffuse + EMISSION, 1.0);
+    out_normal_depth = vec4(NORMAL * 0.5 + 0.5, gl_FragCoord.z);
 }}
 """
 

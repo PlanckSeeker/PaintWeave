@@ -16,7 +16,6 @@ dependencies = [
     "torch>=2.2.0",
     "numpy>=1.26.0",
     "scipy>=1.12.0",
-    "pydantic>=2.6.0",
     "PySide6>=6.6.0",
     "NodeGraphQt>=0.6.0",
     "moderngl>=5.8.0",
@@ -31,8 +30,10 @@ dev = [
     "ruff>=0.3.0",
 ]
 
-[project.scripts]
+[project.gui-scripts]
 paintweave = "paintweave.main:main"
+
+[project.scripts]
 paintweave-cli = "paintweave.cli:main"
 
 [tool.hatch.build.targets.wheel]
@@ -46,11 +47,13 @@ target-version = "py311"
 select = ["E", "F", "I", "UP"]
 ignore = ["E501"]
 
-# --- NVIDIA RTX 4060 CUDA 13.4 PyTorch Configuration ---
+# --- NVIDIA RTX CUDA PyTorch Wheel Configuration (Windows / Linux) ---
 [[tool.uv.index]]
-name = "pytorch-cu134"
-url = "https://download.pytorch.org/whl/cu134"
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
 explicit = true
 
 [tool.uv.sources]
-torch = { index = "pytorch-cu134" }
+torch = [
+    { index = "pytorch-cu126", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
+]

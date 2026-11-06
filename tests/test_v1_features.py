@@ -188,7 +188,7 @@ def test_v1_simplex_noise_and_uv_checker_vops() -> None:
     glsl = payload.build_fragment_shader()
     assert "pw_fbm(" in glsl
     assert "v_uv" in glsl
-    assert "vec3 V = normalize(-v_world_pos);" in glsl
+    assert "vec3 V = normalize(u_camera_pos - v_world_pos);" in glsl
 
 
 def test_v1_canvas_undo_redo_and_copy_paste_duplicate() -> None:
@@ -239,3 +239,129 @@ def test_v1_example_04_loads_and_cooks() -> None:
     assert geo is not None
     assert geo.num_points > 500
     assert len(geo.detail["materials"]) == 2
+
+
+def test_med02_inspector_and_code_studio_undo_redo() -> None:
+    """[MED-02] Parameter Inspector and Code Studio edits must record Undo snapshots."""
+    _ensure_qapp()
+    from paintweave.core.datatypes import CodeString
+    from paintweave.gui.main_window import PaintWeaveMainWindow
+
+    win = PaintWeaveMainWindow()
+    win.file_new()
+    grid = win.canvas_ctrl.spawn_node("SOP_Grid", pos=(0, 0), record_undo=True)
+    win._on_node_selected(grid)
+
+    assert float(grid.get_param("size_x")) == 6.0
+    win.inspector_widget._update_param("size_x", 12.5)
+    assert float(win._selected_node.get_param("size_x")) == 12.5  # type: ignore[union-attr]
+
+    # Undo parameter edit
+    win.edit_undo()
+    assert win._selected_node is not None
+    assert float(win._selected_node.get_param("size_x")) == 6.0
+
+    # Redo parameter edit
+    win.edit_redo()
+    assert win._selected_node is not None
+    assert float(win._selected_node.get_param("size_x")) == 12.5
+
+    # Test Code Studio undo/redo
+    wrangle = win.canvas_ctrl.spawn_node("SOP_Wrangle", pos=(200, 0), record_undo=True)
+    win._on_node_selected(wrangle)
+    orig_code = str(wrangle.get_param("code"))
+    win.code_studio.source_editor.setPlainText("P[:, 1] += 2.0\n")
+    win.code_studio._apply_current_code()
+    assert str(win._selected_node.get_param("code")) == CodeString("P[:, 1] += 2.0\n")
+
+    win.edit_undo()
+    assert str(win._selected_node.get_param("code")) == orig_code
+    win.close()
+
+
+def test_med03_wrangle_does_not_pollute_geometry_with_local_scalars() -> None:
+    """[MED-03] Temporary scalar variables in SOP_Wrangle must not become point attributes."""
+    register_all_nodes()
+    grid = create_node("SOP_Grid")
+    wrangle = create_node("SOP_Wrangle")
+    grid.outputs["Geo"].connect(wrangle.inputs["Geo"])
+
+    wrangle.set_param(
+        "code",
+        "freq = 4.5\namp = 0.25\nhelper_str = 'ignore_me'\nP[:, 1] = np.sin(P[:, 0] * freq) * amp\n",
+    )
+    wrangle.cook()
+    geo = wrangle.outputs["Geo"].value
+    assert geo is not None
+    assert "freq" not in geo.points
+    assert "amp" not in geo.points
+    assert "helper_str" not in geo.points
+
+
+def test_med04_assign_material_missing_group_does_not_overwrite_all() -> None:
+    """[MED-04] Missing non-empty group name in assign_material must leave primitives unchanged."""
+    register_all_nodes()
+    grid = create_node("SOP_Grid")
+    rim = create_node("VOP_RimLight")
+    mat = create_node("SOP_Material")
+    mat.set_param("group", "nonexistent_group_xyz")
+
+    grid.outputs["Geo"].connect(mat.inputs["Geo"])
+    rim.outputs["Shader"].connect(mat.inputs["Shader"])
+    mat.cook()
+
+    geo = mat.outputs["Geo"].value
+    assert geo is not None
+    # All primitives should remain at default material_id (-1) since group did not match
+    assert np.all(geo.primitives["material_id"] == -1)
+
+
+def test_med05_obj_loader_negative_indices_and_seam_uvs(tmp_path: Path) -> None:
+    """[MED-05] Geometry.load_from_obj must handle negative indices and mismatched vt/v seam counts."""
+    obj_content = (
+        "v 0.0 0.0 0.0\n"
+        "v 1.0 0.0 0.0\n"
+        "v 0.0 1.0 0.0\n"
+        "vt 0.1 0.2\n"
+        "vt 0.8 0.2\n"
+        "vt 0.1 0.9\n"
+        "vt 0.99 0.99\n"  # 4 vt entries vs 3 v entries (seam)
+        "vn 0.0 0.0 1.0\n"
+        "f -3/-4/-1 -2/-3/-1 -1/-2/-1\n"
+    )
+    obj_file = tmp_path / "seam_neg.obj"
+    obj_file.write_text(obj_content, encoding="utf-8")
+
+    geo = Geometry.load_from_obj(str(obj_file))
+    assert geo.num_points == 3
+    assert geo.num_primitives == 1
+    assert np.allclose(geo.points["uv"][0], [0.1, 0.2], atol=1e-5)
+    assert np.allclose(geo.points["uv"][1], [0.8, 0.2], atol=1e-5)
+    assert np.allclose(geo.points["uv"][2], [0.1, 0.9], atol=1e-5)
+    assert np.allclose(geo.points["N"][0], [0.0, 0.0, 1.0], atol=1e-5)
+
+
+def test_med06_med07_med09_camera_pos_registry_counter_and_ndarray_param() -> None:
+    """[MED-06, MED-07, MED-09] Camera eye uniform, registry suffix sync, and np.ndarray set_param."""
+    from paintweave.engine.renderer.camera import IsometricCamera
+
+    cam = IsometricCamera()
+    pos1 = cam.get_camera_position()
+    cam.orbit(45.0, 15.0)
+    pos2 = cam.get_camera_position()
+    assert pos1 != pos2
+
+    # [MED-07] Custom name suffix updates _node_counter to prevent future collisions
+    register_all_nodes()
+    n_custom = NodeRegistry.create_node("SOP_Grid", custom_name="SOP_Grid_500")
+    assert n_custom.name == "SOP_Grid_500"
+    n_next = NodeRegistry.create_node("SOP_Grid")
+    assert n_next.name == "SOP_Grid_501"
+
+    # [MED-09] Setting np.ndarray parameter in NodeBase.set_param must not raise ValueError
+    n_next.add_param("arr_param", np.array([1.0, 2.0, 3.0], dtype=np.float32))
+    n_next._is_dirty = False
+    n_next.set_param("arr_param", np.array([1.0, 2.0, 3.0], dtype=np.float32))
+    assert n_next._is_dirty is False
+    n_next.set_param("arr_param", np.array([4.0, 5.0, 6.0], dtype=np.float32))
+    assert n_next._is_dirty is True

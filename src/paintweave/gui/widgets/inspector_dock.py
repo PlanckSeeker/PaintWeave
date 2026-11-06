@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from PySide6.QtCore import Qt, Signal
@@ -33,6 +34,7 @@ class NodePropertyInspector(QWidget):
     """Dynamic property editor auto-generated from `NodeBase.all_param_specs()`."""
 
     parameter_changed = Signal(object)  # Emits modified NodeBase
+    undo_snapshot_requested = Signal()  # Emits before mutating parameter/flag state
     display_flag_toggled = Signal(str)  # Emits node_id
     template_flag_toggled = Signal(str, bool)  # Emits (node_id, enabled)
     bypass_flag_toggled = Signal(str, bool)  # Emits (node_id, bypassed)
@@ -40,6 +42,8 @@ class NodePropertyInspector(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._current_node: NodeBase | None = None
+        self._last_undo_key: tuple[str, str] | None = None
+        self._last_undo_time: float = 0.0
         layout = QVBoxLayout(self)
         layout.setContentsMargins(6, 6, 6, 6)
         layout.setSpacing(6)
@@ -363,6 +367,25 @@ class NodePropertyInspector(QWidget):
     def _update_param(self, key: str, value: Any) -> None:
         if self._current_node is None:
             return
+        cur_val = (
+            self._current_node.params.get(key)
+            if key in self._current_node.params
+            else (
+                self._current_node.inputs[key].value
+                if key in self._current_node.inputs
+                else None
+            )
+        )
+        if cur_val != value:
+            now = time.monotonic()
+            if (
+                (self._current_node.id, key) != self._last_undo_key
+                or (now - self._last_undo_time) > 0.6
+            ):
+                self.undo_snapshot_requested.emit()
+                self._last_undo_key = (self._current_node.id, key)
+            self._last_undo_time = now
+
         prev_keys = set(self._current_node.params.keys())
         self._current_node.set_param(key, value)
         self.parameter_changed.emit(self._current_node)
@@ -395,6 +418,7 @@ class NodePropertyInspector(QWidget):
             self.template_flag_toggled.emit(self._current_node.id, checked)
 
     def _on_bypass_clicked(self, checked: bool) -> None:
-        if self._current_node is not None:
+        if self._current_node is not None and self._current_node.is_bypassed != checked:
+            self.undo_snapshot_requested.emit()
             self._current_node.set_bypassed(checked)
             self.bypass_flag_toggled.emit(self._current_node.id, checked)

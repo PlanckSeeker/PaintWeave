@@ -332,7 +332,7 @@ class MergeSOPNode(NodeBase):
                 ref_shape = g1.points[k].shape[1:] if k in g1.points else (3,)
                 arr2 = np.zeros((g2.num_points,) + ref_shape, dtype=np.float32)
 
-            out_geo.set_point_attrib(k, np.vstack([arr1, arr2]))
+            out_geo.set_point_attrib(k, np.concatenate([arr1, arr2], axis=0))
 
         # 2. Merge Primitives & Re-index Material IDs so both streams keep their distinct VOP shaders!
         t1 = g1.primitives["triangles"]

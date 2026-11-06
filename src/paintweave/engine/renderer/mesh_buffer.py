@@ -23,11 +23,14 @@ class MaterialDrawBatch:
     shader_payload: ShaderPayload | None
     owns_program: bool
     index_count: int
+    depth_vao: moderngl.VertexArray | None = None
 
 
 class GPUMeshBuffer:
     """
     Manages dynamic ModernGL VBOs and multi-material EBO/VAO draw batches for a columnar Geometry table.
+    Supports in-place VBO buffer streaming (.write()) when point count and topology layout match,
+    eliminating GPU memory churn during timeline playback and interactive wrangle deformations.
     Caches compiled ModernGL programs by (vertex_shader, fragment_shader) source pair to eliminate
     per-frame GLSL recompilation during 60 FPS timeline playback.
     """
@@ -41,7 +44,9 @@ class GPUMeshBuffer:
 
         self.batches: list[MaterialDrawBatch] = []
         self._program_cache: dict[tuple[str, str], moderngl.Program] = {}
+        self.depth_program: moderngl.Program | None = None
         self.point_vao: moderngl.VertexArray | None = None
+        self.point_depth_vao: moderngl.VertexArray | None = None
         self.point_count: int = 0
         self.index_count: int = 0
 
@@ -79,21 +84,65 @@ class GPUMeshBuffer:
         self._program_cache[key] = prog
         return prog
 
+    def _can_stream_in_place(
+        self,
+        geo: Geometry,
+        mat_ids: np.ndarray,
+        unique_mats: np.ndarray,
+        materials_map: dict[int, ShaderPayload],
+        default_shader: ShaderPayload | None,
+    ) -> bool:
+        """Check if vertex buffers and batch index buffers match previous allocation layout."""
+        if (
+            self.point_count != geo.num_points
+            or self.vbo_p is None
+            or self.vbo_n is None
+            or self.vbo_cd is None
+            or self.vbo_uv is None
+        ):
+            return False
+
+        if geo.num_primitives == 0:
+            return self.index_count == 0 and self.point_vao is not None
+
+        if len(self.batches) != len(unique_mats):
+            return False
+
+        for idx, mid_val in enumerate(unique_mats):
+            mid = int(mid_val)
+            batch = self.batches[idx]
+            if batch.mat_id != mid:
+                return False
+            sub_count = int(np.count_nonzero(mat_ids == mid) * 3)
+            if batch.index_count != sub_count:
+                return False
+            payload = materials_map.get(mid) if mid >= 0 else None
+            active_payload = payload if payload is not None else default_shader
+            if batch.shader_payload != active_payload:
+                return False
+
+        return True
+
     def upload(
         self,
         geo: Geometry | None,
         default_program: moderngl.Program,
         default_shader: ShaderPayload | None = None,
+        depth_program: moderngl.Program | None = None,
     ) -> list[str]:
         """
         Upload geometry attributes and partition primitive draw batches by `@material_id`.
+        Performs zero-allocation in-place buffer streaming (.write()) when topology matches,
+        eliminating GPU memory churn during timeline playback and interactive wrangles.
         Reuses cached ModernGL shader programs across frames when GLSL source is unchanged.
         Returns a list of any shader compilation errors encountered on material batches.
         """
-        self.release(release_programs=False)
-        errors: list[str] = []
+        if depth_program is not None:
+            self.depth_program = depth_program
 
+        errors: list[str] = []
         if geo is None or geo.num_points == 0:
+            self.release(release_programs=False)
             return errors
 
         n_pts = geo.num_points
@@ -115,6 +164,30 @@ class GPUMeshBuffer:
         else:
             uv_data = np.zeros((n_pts, 2), dtype=np.float32)
 
+        mat_ids = geo.ensure_material_ids() if geo.num_primitives > 0 else np.array([], dtype=np.int32)
+        materials_map: dict[int, ShaderPayload] = geo.detail.get("materials", {})
+        unique_mats = np.unique(mat_ids) if geo.num_primitives > 0 else np.array([], dtype=np.int32)
+        tris = np.ascontiguousarray(geo.primitives["triangles"], dtype=np.uint32) if geo.num_primitives > 0 else None
+
+        # Check for zero-reallocation in-place streaming
+        if self._can_stream_in_place(geo, mat_ids, unique_mats, materials_map, default_shader):
+            assert self.vbo_p is not None and self.vbo_n is not None
+            assert self.vbo_cd is not None and self.vbo_uv is not None
+            self.vbo_p.write(p_data.tobytes())
+            self.vbo_n.write(n_data.tobytes())
+            self.vbo_cd.write(cd_data.tobytes())
+            self.vbo_uv.write(uv_data.tobytes())
+
+            if tris is not None:
+                for idx, mid_val in enumerate(unique_mats):
+                    mid = int(mid_val)
+                    sub_tris = np.ascontiguousarray(tris[mat_ids == mid], dtype=np.uint32)
+                    self.batches[idx].ebo.write(sub_tris.tobytes())
+            return errors
+
+        # Topology or batch configuration changed: full buffer allocation
+        self.release(release_programs=False)
+
         self.vbo_p = self.ctx.buffer(p_data.tobytes())
         self.vbo_n = self.ctx.buffer(n_data.tobytes())
         self.vbo_cd = self.ctx.buffer(cd_data.tobytes())
@@ -124,13 +197,11 @@ class GPUMeshBuffer:
         # Point-cloud fallback (e.g., SOP_Scatter output with 0 triangles)
         if geo.num_primitives == 0:
             self.point_vao = self._build_vao(default_program, ebo=None)
+            if self.depth_program is not None:
+                self.point_depth_vao = self._build_vao(self.depth_program, ebo=None)
             return errors
 
-        tris = np.ascontiguousarray(geo.primitives["triangles"], dtype=np.uint32)
-        mat_ids = geo.ensure_material_ids()
-        materials_map: dict[int, ShaderPayload] = geo.detail.get("materials", {})
-
-        unique_mats = np.unique(mat_ids)
+        assert tris is not None
         total_indices = 0
 
         for mat_id_val in unique_mats:
@@ -158,6 +229,10 @@ class GPUMeshBuffer:
                     prog = default_program
 
             vao = self._build_vao(prog, ebo=ebo)
+            depth_vao = None
+            if self.depth_program is not None:
+                depth_vao = self._build_vao(self.depth_program, ebo=ebo)
+
             if vao is not None:
                 self.batches.append(
                     MaterialDrawBatch(
@@ -168,16 +243,50 @@ class GPUMeshBuffer:
                         shader_payload=active_payload,
                         owns_program=owns_prog,
                         index_count=int(sub_tris.size),
+                        depth_vao=depth_vao,
                     )
                 )
                 total_indices += int(sub_tris.size)
             else:
                 ebo.release()
+                if depth_vao is not None:
+                    depth_vao.release()
 
         self.index_count = total_indices
         return errors
 
-    def render(self, mvp_bytes: bytes, model_bytes: bytes, time_val: float) -> None:
+    def render_depth(
+        self,
+        light_space_bytes: bytes,
+        model_bytes: bytes,
+        depth_program: moderngl.Program | None = None,
+    ) -> None:
+        """Render geometry from directional light space for shadow depth map generation (Pass 1)."""
+        prog = depth_program if depth_program is not None else self.depth_program
+        if prog is None:
+            return
+        if "u_light_space_matrix" in prog:
+            prog["u_light_space_matrix"].write(light_space_bytes)
+        if "u_model" in prog:
+            prog["u_model"].write(model_bytes)
+
+        if self.batches:
+            for batch in self.batches:
+                if batch.depth_vao is not None:
+                    batch.depth_vao.render(moderngl.TRIANGLES)
+        elif self.point_depth_vao is not None and self.point_count > 0:
+            self.ctx.point_size = 5.0
+            self.point_depth_vao.render(moderngl.POINTS)
+
+    def render(
+        self,
+        mvp_bytes: bytes,
+        model_bytes: bytes,
+        time_val: float,
+        camera_pos: tuple[float, float, float] = (11.5, 11.5, 11.5),
+        light_space_bytes: bytes | None = None,
+        shadow_enabled: bool = True,
+    ) -> None:
         """Render all multi-material primitive batches (or point cloud if 0 triangles)."""
         if self.batches:
             for batch in self.batches:
@@ -188,6 +297,14 @@ class GPUMeshBuffer:
                     prog["u_model"].write(model_bytes)
                 if "TIME" in prog:
                     prog["TIME"].value = time_val
+                if "u_camera_pos" in prog:
+                    prog["u_camera_pos"].value = camera_pos
+                if "u_light_space_matrix" in prog and light_space_bytes is not None:
+                    prog["u_light_space_matrix"].write(light_space_bytes)
+                if "u_shadow_enabled" in prog:
+                    prog["u_shadow_enabled"].value = 1 if shadow_enabled else 0
+                if "u_shadow_map" in prog:
+                    prog["u_shadow_map"].value = 0
 
                 if batch.shader_payload is not None:
                     for u_name, (
@@ -215,6 +332,8 @@ class GPUMeshBuffer:
         for batch in self.batches:
             batch.vao.release()
             batch.ebo.release()
+            if batch.depth_vao is not None:
+                batch.depth_vao.release()
             if batch.owns_program and release_programs:
                 batch.program.release()
         self.batches.clear()
@@ -225,6 +344,9 @@ class GPUMeshBuffer:
         if self.point_vao is not None:
             self.point_vao.release()
             self.point_vao = None
+        if self.point_depth_vao is not None:
+            self.point_depth_vao.release()
+            self.point_depth_vao = None
 
         for buf in (self.vbo_p, self.vbo_n, self.vbo_cd, self.vbo_uv):
             if buf is not None:

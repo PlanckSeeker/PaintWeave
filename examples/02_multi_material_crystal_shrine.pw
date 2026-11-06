@@ -1,6 +1,6 @@
 {
   "name": "02_Multi_Material_Crystal_Shrine",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "nodes": [
     {
       "id": "grid_base",

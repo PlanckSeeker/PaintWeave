@@ -2,8 +2,10 @@
 
 from paintweave.core.registry import NodeRegistry
 from paintweave.nodes.sop.attributes import (
+    AmbientGradientSOPNode,
     AttributeRandomizeSOPNode,
     ColorSOPNode,
+    CurvatureSOPNode,
     GroupSOPNode,
     UVProjectSOPNode,
     WrangleSOPNode,
@@ -21,6 +23,7 @@ from paintweave.nodes.sop.modifiers import (
     NormalSOPNode,
     RaycastSOPNode,
     SmoothSOPNode,
+    StylizedDamageSOPNode,
     SubdivideSOPNode,
     SweepSOPNode,
     TransformSOPNode,
@@ -52,12 +55,15 @@ def register_sop_nodes() -> None:
     NodeRegistry.register("SOP_Normal", NormalSOPNode)
     NodeRegistry.register("SOP_Sweep", SweepSOPNode)
     NodeRegistry.register("SOP_Raycast", RaycastSOPNode)
+    NodeRegistry.register("SOP_StylizedDamage", StylizedDamageSOPNode)
 
     NodeRegistry.register("SOP_Group", GroupSOPNode)
     NodeRegistry.register("SOP_Color", ColorSOPNode)
     NodeRegistry.register("SOP_AttributeRandomize", AttributeRandomizeSOPNode)
     NodeRegistry.register("SOP_UVProject", UVProjectSOPNode)
     NodeRegistry.register("SOP_Wrangle", WrangleSOPNode)
+    NodeRegistry.register("SOP_AmbientGradient", AmbientGradientSOPNode)
+    NodeRegistry.register("SOP_Curvature", CurvatureSOPNode)
 
     NodeRegistry.register("SOP_Scatter", ScatterSOPNode)
     NodeRegistry.register("SOP_CopyToPoints", CopyToPointsSOPNode)

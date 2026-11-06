@@ -319,9 +319,14 @@ class WrangleSOPNode(NodeBase):
                 continue
             if HAS_TORCH and torch is not None and isinstance(v, torch.Tensor):
                 v = v.detach().cpu().numpy()
-            arr = np.asarray(v, dtype=np.float32)
-            if arr.ndim == 0 or arr.size == 1:
-                arr = np.tile(arr, (in_geo.num_points, 1))
+            try:
+                arr = np.asarray(v, dtype=np.float32)
+            except (ValueError, TypeError):
+                continue
+            if arr.ndim == 0 or (arr.size == 1 and in_geo.num_points > 1):
+                if k not in in_geo.points:
+                    continue
+                arr = np.tile(arr.reshape(1, 1), (in_geo.num_points, 1))
             if arr.ndim == 1:
                 arr = arr.reshape(-1, 1)
             if arr.shape[0] == in_geo.num_points:
@@ -457,4 +462,254 @@ class UVProjectSOPNode(NodeBase):
 
         uv = np.column_stack([u * su + ou, v * sv + ov]).astype(np.float32)
         out_geo.set_point_attrib("uv", uv)
+        self.outputs["Geo"].value = out_geo
+
+
+class AmbientGradientSOPNode(NodeBase):
+    """
+    Applies a vertical ambient value/color gradient across geometry bounding box,
+    producing the signature top-to-bottom hand-painted lighting look of Blizzard and Ankama art.
+    Computes normalized vertical fade into `@vert_fade` and optionally blends with `@Cd`.
+    """
+
+    context = NodeContext.SOP
+    category = "Attributes & Groups"
+    title = "Ambient Gradient (Vertical Fade)"
+
+    INPUT_PORTS = [
+        PortSpec("Geo", DataType.GEOMETRY, None, "Input geometry to tint with vertical gradient."),
+    ]
+    OUTPUT_PORTS = [
+        PortSpec("Geo", DataType.GEOMETRY, None, "Geometry with @vert_fade and tinted @Cd."),
+    ]
+    PARAM_SPECS = [
+        ParamSpec(
+            "blend_mode",
+            "str",
+            "Multiply",
+            label="Blend Mode",
+            choices=["Multiply", "Tint", "Replace", "None (Attribute Only)"],
+        ),
+        ParamSpec(
+            "tint_top",
+            "vec3",
+            (1.0, 0.95, 0.85),
+            label="Top Sky Tint",
+            description="Warm top sunlight / sky highlight color.",
+        ),
+        ParamSpec(
+            "tint_bottom",
+            "vec3",
+            (0.40, 0.42, 0.58),
+            label="Bottom Ground Tint",
+            description="Cool ground bounce / slate shadow color.",
+        ),
+        ParamSpec(
+            "contrast",
+            "float",
+            1.0,
+            label="Gradient Contrast",
+            min_val=0.1,
+            max_val=4.0,
+            step=0.05,
+        ),
+        ParamSpec(
+            "offset_y",
+            "float",
+            0.0,
+            label="Vertical Offset",
+            min_val=-2.0,
+            max_val=2.0,
+            step=0.05,
+        ),
+        ParamSpec(
+            "attr_name",
+            "str",
+            "vert_fade",
+            label="Attribute Name",
+        ),
+    ]
+
+    def evaluate(self) -> None:
+        in_geo: Geometry | None = self.inputs["Geo"].get_data()
+        if in_geo is None or in_geo.num_points == 0:
+            self.outputs["Geo"].value = Geometry()
+            return
+
+        out_geo = in_geo.clone()
+        p = in_geo.points["P"]
+        mode = str(self.get_param("blend_mode"))
+        attr_name = str(self.get_param("attr_name"))
+        contrast = max(0.01, float(self.get_param("contrast")))
+        offset_y = float(self.get_param("offset_y"))
+        top_c = np.array(self.get_param("tint_top"), dtype=np.float32)
+        bottom_c = np.array(self.get_param("tint_bottom"), dtype=np.float32)
+
+        y_min = float(np.min(p[:, 1]))
+        y_max = float(np.max(p[:, 1]))
+        y_span = max(y_max - y_min, 1e-5)
+
+        h = np.clip((p[:, 1] - y_min) / y_span + offset_y, 0.0, 1.0)
+        if abs(contrast - 1.0) > 1e-4:
+            h = np.power(h, contrast)
+
+        out_geo.set_point_attrib(attr_name, h.astype(np.float32))
+
+        if mode != "None (Attribute Only)":
+            grad_c = (1.0 - h[:, None]) * bottom_c + h[:, None] * top_c
+            if "Cd" in in_geo.points and in_geo.points["Cd"].shape[0] == p.shape[0]:
+                curr_cd = in_geo.points["Cd"]
+            else:
+                curr_cd = np.full((p.shape[0], 3), 0.72, dtype=np.float32)
+
+            if mode == "Multiply":
+                new_cd = curr_cd * grad_c
+            elif mode == "Tint":
+                new_cd = curr_cd * 0.5 + grad_c * 0.5
+            else:  # Replace
+                new_cd = grad_c
+
+            out_geo.set_point_attrib("Cd", np.clip(new_cd, 0.0, 2.0).astype(np.float32))
+
+        self.outputs["Geo"].value = out_geo
+
+
+class CurvatureSOPNode(NodeBase):
+    """
+    Computes discrete Laplacian surface curvature to isolate convex peaks/bevels (@highlight)
+    and concave crevices/valleys (@cavity). Used in Arcane, Dofus, and Hearthstone workflows
+    for chalky edge wear, gold bevel glints, and pooled watercolor crevice grime.
+    """
+
+    context = NodeContext.SOP
+    category = "Attributes & Groups"
+    title = "Curvature & Edge Highlights"
+
+    INPUT_PORTS = [
+        PortSpec("Geo", DataType.GEOMETRY, None, "Input surface geometry."),
+    ]
+    OUTPUT_PORTS = [
+        PortSpec("Geo", DataType.GEOMETRY, None, "Geometry with @highlight, @cavity, and painterly @Cd."),
+    ]
+    PARAM_SPECS = [
+        ParamSpec(
+            "highlight_intensity",
+            "float",
+            1.5,
+            label="Highlight Intensity",
+            min_val=0.0,
+            max_val=5.0,
+            step=0.1,
+        ),
+        ParamSpec(
+            "cavity_intensity",
+            "float",
+            1.5,
+            label="Cavity Grime Intensity",
+            min_val=0.0,
+            max_val=5.0,
+            step=0.1,
+        ),
+        ParamSpec(
+            "contrast",
+            "float",
+            1.2,
+            label="Curvature Contrast",
+            min_val=0.2,
+            max_val=4.0,
+            step=0.1,
+        ),
+        ParamSpec(
+            "tint_cd",
+            "bool",
+            True,
+            label="Tint Vertex Colors (@Cd)",
+            description="Applies hand-painted chalky edge highlights and crevice grime directly into @Cd.",
+        ),
+        ParamSpec(
+            "highlight_color",
+            "vec3",
+            (1.0, 0.98, 0.92),
+            label="Highlight Edge Color",
+            description="Chalky gouache edge wear / bevel highlight color.",
+        ),
+        ParamSpec(
+            "cavity_color",
+            "vec3",
+            (0.18, 0.16, 0.22),
+            label="Cavity Grime Color",
+            description="Dark pooled grime / ambient shadow crevice color.",
+        ),
+    ]
+
+    def evaluate(self) -> None:
+        in_geo: Geometry | None = self.inputs["Geo"].get_data()
+        if in_geo is None or in_geo.num_points == 0:
+            self.outputs["Geo"].value = Geometry()
+            return
+
+        out_geo = in_geo.clone()
+        p = in_geo.points["P"]
+        n_pts = p.shape[0]
+
+        high_mult = float(self.get_param("highlight_intensity"))
+        cav_mult = float(self.get_param("cavity_intensity"))
+        contrast = max(0.01, float(self.get_param("contrast")))
+        do_tint = bool(self.get_param("tint_cd"))
+        high_col = np.array(self.get_param("highlight_color"), dtype=np.float32)
+        cav_col = np.array(self.get_param("cavity_color"), dtype=np.float32)
+
+        if "N" in in_geo.points and in_geo.points["N"].shape == p.shape:
+            n = in_geo.points["N"]
+        else:
+            n = np.zeros_like(p)
+            n[:, 1] = 1.0
+
+        highlight = np.zeros(n_pts, dtype=np.float32)
+        cavity = np.zeros(n_pts, dtype=np.float32)
+
+        if in_geo.num_primitives > 0:
+            tris = in_geo.primitives["triangles"]
+            neighbor_sum = np.zeros_like(p)
+            neighbor_count = np.zeros(n_pts, dtype=np.float32)
+
+            for i in range(3):
+                u = tris[:, i]
+                v = tris[:, (i + 1) % 3]
+                np.add.at(neighbor_sum, u, p[v])
+                np.add.at(neighbor_count, u, 1.0)
+                np.add.at(neighbor_sum, v, p[u])
+                np.add.at(neighbor_count, v, 1.0)
+
+            safe_count = np.where(neighbor_count < 1.0, 1.0, neighbor_count)[:, None]
+            centroid_neighbors = neighbor_sum / safe_count
+            laplacian = centroid_neighbors - p
+            kappa = -np.sum(laplacian * n, axis=1)
+
+            b_extent = max(float(np.linalg.norm(np.max(p, axis=0) - np.min(p, axis=0))), 0.1)
+            scale = 10.0 / b_extent
+
+            raw_high = np.clip(np.maximum(kappa * scale, 0.0), 0.0, 5.0)
+            raw_cav = np.clip(np.maximum(-kappa * scale, 0.0), 0.0, 5.0)
+
+            if abs(contrast - 1.0) > 1e-4:
+                raw_high = np.power(raw_high / 5.0, contrast) * 5.0
+                raw_cav = np.power(raw_cav / 5.0, contrast) * 5.0
+
+            highlight = np.clip(raw_high * high_mult, 0.0, 1.0)
+            cavity = np.clip(raw_cav * cav_mult, 0.0, 1.0)
+
+        out_geo.set_point_attrib("highlight", highlight.astype(np.float32))
+        out_geo.set_point_attrib("cavity", cavity.astype(np.float32))
+
+        if do_tint:
+            if "Cd" in in_geo.points and in_geo.points["Cd"].shape[0] == n_pts:
+                cd = in_geo.points["Cd"].copy()
+            else:
+                cd = np.full((n_pts, 3), 0.72, dtype=np.float32)
+
+            cd = cd * (1.0 - highlight[:, None] * 0.7) + high_col * (highlight[:, None] * 0.7)
+            cd = cd * (1.0 - cavity[:, None] * 0.75) + cav_col * (cavity[:, None] * 0.75)
+            out_geo.set_point_attrib("Cd", np.clip(cd, 0.0, 1.0).astype(np.float32))
+
         self.outputs["Geo"].value = out_geo

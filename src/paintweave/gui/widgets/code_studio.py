@@ -93,6 +93,7 @@ class CodeStudioPanel(QWidget):
     """
 
     code_applied = Signal(object)  # Emits modified NodeBase
+    undo_snapshot_requested = Signal()  # Emits before mutating script code
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -244,6 +245,8 @@ class CodeStudioPanel(QWidget):
     def _apply_current_code(self) -> None:
         if self._current_node is not None and "code" in self._current_node.params:
             new_code = CodeString(self.source_editor.toPlainText())
+            if self._current_node.params.get("code") != new_code:
+                self.undo_snapshot_requested.emit()
             self._current_node.set_param("code", new_code)
             self.code_applied.emit(self._current_node)
             self.refresh_compiled_preview()

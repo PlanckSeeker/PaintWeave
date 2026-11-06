@@ -13,11 +13,13 @@ in vec2 in_uv;
 
 uniform mat4 u_mvp;
 uniform mat4 u_model;
+uniform mat4 u_light_space_matrix = mat4(1.0);
 
 out vec3 v_world_pos;
 out vec3 v_normal;
 out vec3 v_color;
 out vec2 v_uv;
+out vec4 v_light_space_pos;
 
 void main() {
     vec4 world = u_model * vec4(in_position, 1.0);
@@ -25,6 +27,7 @@ void main() {
     v_normal = normalize(mat3(u_model) * in_normal);
     v_color = in_color;
     v_uv = in_uv;
+    v_light_space_pos = u_light_space_matrix * world;
     gl_Position = u_mvp * world;
 }
 """
@@ -34,7 +37,33 @@ in vec3 v_world_pos;
 in vec3 v_normal;
 in vec3 v_color;
 in vec2 v_uv;
-out vec4 frag_color;
+in vec4 v_light_space_pos;
+
+uniform sampler2D u_shadow_map;
+uniform int u_shadow_enabled = 1;
+
+layout(location = 0) out vec4 out_color;
+layout(location = 1) out vec4 out_normal_depth;
+
+float calc_shadow(vec4 light_space_pos, vec3 normal, vec3 light_dir) {
+    if (u_shadow_enabled == 0) return 1.0;
+    vec3 proj_coords = light_space_pos.xyz / light_space_pos.w;
+    proj_coords = proj_coords * 0.5 + 0.5;
+    if (proj_coords.z > 1.0 || proj_coords.x < 0.0 || proj_coords.x > 1.0 || proj_coords.y < 0.0 || proj_coords.y > 1.0)
+        return 1.0;
+
+    float bias = max(0.003 * (1.0 - dot(normal, light_dir)), 0.0008);
+    float current_depth = proj_coords.z;
+    float shadow = 0.0;
+    vec2 texel_size = 1.0 / vec2(2048.0, 2048.0);
+    for(int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
+            float pcf_depth = texture(u_shadow_map, proj_coords.xy + vec2(x, y) * texel_size).r;
+            shadow += (current_depth - bias > pcf_depth) ? 0.35 : 1.0;
+        }
+    }
+    return shadow / 9.0;
+}
 
 void main() {
     vec3 light_dir = normalize(vec3(0.6, 0.85, 0.5));
@@ -43,8 +72,10 @@ void main() {
     float key = max(dot(N, light_dir), 0.0);
     float fill = max(dot(N, fill_dir), 0.0) * 0.25;
     float amb = 0.18;
-    vec3 shaded = v_color * (amb + key * 0.85 + fill);
-    frag_color = vec4(shaded, 1.0);
+    float s_factor = calc_shadow(v_light_space_pos, N, light_dir);
+    vec3 shaded = v_color * (amb + key * 0.85 * s_factor + fill);
+    out_color = vec4(shaded, 1.0);
+    out_normal_depth = vec4(N * 0.5 + 0.5, gl_FragCoord.z);
 }
 """
 
@@ -106,14 +137,44 @@ class ShaderPayload:
             "in vec3 v_normal;\n"
             "in vec3 v_color;\n"
             "in vec2 v_uv;\n"
+            "in vec4 v_light_space_pos;\n"
             "uniform float TIME;\n"
+            "uniform vec3 u_camera_pos = vec3(11.5, 11.5, 11.5);\n"
+            "uniform sampler2D u_shadow_map;\n"
+            "uniform int u_shadow_enabled = 1;\n"
             f"{uniform_decls}"
-            "out vec4 frag_color;\n"
+            "layout(location = 0) out vec4 out_color;\n"
+            "layout(location = 1) out vec4 out_normal_depth;\n"
             f"{VOP_GLSL_HELPERS}\n"
+            """
+float calc_shadow(vec4 light_space_pos, vec3 normal, vec3 light_dir) {
+    if (u_shadow_enabled == 0) return 1.0;
+    vec3 proj_coords = light_space_pos.xyz / light_space_pos.w;
+    proj_coords = proj_coords * 0.5 + 0.5;
+    if (proj_coords.z > 1.0 || proj_coords.x < 0.0 || proj_coords.x > 1.0 || proj_coords.y < 0.0 || proj_coords.y > 1.0)
+        return 1.0;
+
+    float bias = max(0.003 * (1.0 - dot(normal, light_dir)), 0.0008);
+    float current_depth = proj_coords.z;
+    float shadow = 0.0;
+    vec2 texel_size = 1.0 / vec2(2048.0, 2048.0);
+    for(int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
+            float pcf_depth = texture(u_shadow_map, proj_coords.xy + vec2(x, y) * texel_size).r;
+            shadow += (current_depth - bias > pcf_depth) ? 0.35 : 1.0;
+        }
+    }
+    return shadow / 9.0;
+}
+"""
             "void main() {\n"
             "    vec3 N = normalize(v_normal);\n"
-            "    vec3 V = normalize(-v_world_pos);\n"
+            "    vec3 V = normalize(u_camera_pos - v_world_pos);\n"
+            "    vec3 light_dir = normalize(vec3(0.6, 0.85, 0.5));\n"
             f"{self.fragment_body}\n"
-            "    frag_color = vec4(final_rgb, 1.0);\n"
+            "    float s_factor = calc_shadow(v_light_space_pos, N, light_dir);\n"
+            "    vec3 shaded_final = mix(final_rgb * 0.35, final_rgb, s_factor);\n"
+            "    out_color = vec4(shaded_final, 1.0);\n"
+            "    out_normal_depth = vec4(N * 0.5 + 0.5, gl_FragCoord.z);\n"
             "}\n"
         )

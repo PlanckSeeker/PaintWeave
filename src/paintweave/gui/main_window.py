@@ -40,7 +40,15 @@ class PaintWeaveMainWindow(QMainWindow):
         self.setWindowTitle(
             "PaintWeave Studio v1.0.0 — Procedural Geometry (SOP) & Multi-Material Shader (VOP) IDE"
         )
-        self.resize(1680, 980)
+        screen = self.screen()
+        if screen is not None:
+            avail = screen.availableGeometry()
+            self.resize(
+                min(1680, max(1200, int(avail.width() * 0.94))),
+                min(980, max(720, int(avail.height() * 0.92))),
+            )
+        else:
+            self.resize(1600, 920)
 
         self.current_file_path: str | None = None
         self._selected_node: NodeBase | None = None
@@ -104,6 +112,9 @@ class PaintWeaveMainWindow(QMainWindow):
 
         # Right Dock: Property Inspector
         self.inspector_widget = NodePropertyInspector(self)
+        self.inspector_widget.undo_snapshot_requested.connect(
+            self.canvas_ctrl.push_undo_snapshot
+        )
         self.inspector_widget.parameter_changed.connect(self._on_node_param_changed)
         self.inspector_widget.display_flag_toggled.connect(
             self._on_display_flag_changed
@@ -119,6 +130,9 @@ class PaintWeaveMainWindow(QMainWindow):
         self.code_studio = CodeStudioPanel(self)
         self.telemetry_panel = CookTelemetryPanel(self)
 
+        self.code_studio.undo_snapshot_requested.connect(
+            self.canvas_ctrl.push_undo_snapshot
+        )
         self.code_studio.code_applied.connect(self._on_node_param_changed)
 
         self.workbench_tabs.addTab(
@@ -139,13 +153,13 @@ class PaintWeaveMainWindow(QMainWindow):
         # Left Dock: Operator Palette
         self.dock_palette = QDockWidget("Operator Catalog (SOP / VOP / Math)", self)
         self.dock_palette.setWidget(self.palette_widget)
-        self.dock_palette.setMinimumWidth(250)
+        self.dock_palette.setMinimumWidth(220)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.dock_palette)
 
         # Right Dock: Parameter Inspector
         self.dock_inspector = QDockWidget("Node Parameter Inspector", self)
         self.dock_inspector.setWidget(self.inspector_widget)
-        self.dock_inspector.setMinimumWidth(330)
+        self.dock_inspector.setMinimumWidth(290)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock_inspector)
 
         # Bottom Dock: Spreadsheet, Code Studio & Telemetry
@@ -153,7 +167,7 @@ class PaintWeaveMainWindow(QMainWindow):
             "Geometry Spreadsheet, Shader Studio & Telemetry", self
         )
         self.dock_workbench.setWidget(self.workbench_tabs)
-        self.dock_workbench.setMinimumHeight(270)
+        self.dock_workbench.setMinimumHeight(250)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.dock_workbench)
 
     def _init_menus_and_toolbar(self) -> None:
@@ -163,26 +177,31 @@ class PaintWeaveMainWindow(QMainWindow):
         file_menu = menubar.addMenu("&File")
 
         act_new = QAction("New Procedural Graph", self)
+        act_new.setIconText("New")
         act_new.setShortcut(QKeySequence.StandardKey.New)
         act_new.triggered.connect(self.file_new)
         file_menu.addAction(act_new)
 
         act_open = QAction("Open Project (.pw / .nw)...", self)
+        act_open.setIconText("Open")
         act_open.setShortcut(QKeySequence.StandardKey.Open)
         act_open.triggered.connect(self.file_open)
         file_menu.addAction(act_open)
 
         act_save = QAction("Save Project (.pw)...", self)
+        act_save.setIconText("Save")
         act_save.setShortcut(QKeySequence.StandardKey.Save)
         act_save.triggered.connect(self.file_save)
         file_menu.addAction(act_save)
 
         file_menu.addSeparator()
         act_export_obj = QAction("Export Display Mesh (.obj)...", self)
+        act_export_obj.setIconText("Export OBJ")
         act_export_obj.triggered.connect(self.export_mesh_obj)
         file_menu.addAction(act_export_obj)
 
         act_render_png = QAction("📸 Render Viewport to Image (.png)... (F12)", self)
+        act_render_png.setIconText("📸 Render")
         act_render_png.setShortcut(QKeySequence("F12"))
         act_render_png.triggered.connect(self.export_render_png)
         file_menu.addAction(act_render_png)
@@ -196,11 +215,13 @@ class PaintWeaveMainWindow(QMainWindow):
         edit_menu = menubar.addMenu("&Edit")
 
         self.act_undo = QAction("↩ Undo (Ctrl+Z)", self)
+        self.act_undo.setIconText("↩ Undo")
         self.act_undo.setShortcut(QKeySequence.StandardKey.Undo)
         self.act_undo.triggered.connect(self.edit_undo)
         edit_menu.addAction(self.act_undo)
 
         self.act_redo = QAction("↪ Redo (Ctrl+Y)", self)
+        self.act_redo.setIconText("↪ Redo")
         self.act_redo.setShortcuts(
             [QKeySequence.StandardKey.Redo, QKeySequence("Ctrl+Y")]
         )
@@ -220,6 +241,7 @@ class PaintWeaveMainWindow(QMainWindow):
         edit_menu.addAction(act_paste)
 
         act_dup = QAction("Duplicate Selected Nodes (Ctrl+D)", self)
+        act_dup.setIconText("Duplicate")
         act_dup.setShortcut(QKeySequence("Ctrl+D"))
         act_dup.triggered.connect(self.edit_duplicate)
         edit_menu.addAction(act_dup)
@@ -237,11 +259,13 @@ class PaintWeaveMainWindow(QMainWindow):
         # Graph & Simulation Menu
         sim_menu = menubar.addMenu("&Network")
         act_cook = QAction("⚡ Force Cook Display Network (F5)", self)
+        act_cook.setIconText("⚡ Cook")
         act_cook.setShortcut(QKeySequence("F5"))
         act_cook.triggered.connect(lambda: self.cook_active_network(force=True))
         sim_menu.addAction(act_cook)
 
         act_fit = QAction("🔍 Fit Node Canvas", self)
+        act_fit.setIconText("🔍 Fit")
         act_fit.triggered.connect(self.canvas_ctrl.node_graph.fit_to_selection)
         sim_menu.addAction(act_fit)
 
@@ -262,6 +286,9 @@ class PaintWeaveMainWindow(QMainWindow):
             ("SOP: Copy to Points (Normal Aligned)", "SOP_CopyToPoints"),
             ("SOP: Assign Material (SOP_Material)", "SOP_Material"),
             ("SOP: Point Wrangle (Python)", "SOP_Wrangle"),
+            ("SOP: Ambient Gradient (Blizzard)", "SOP_AmbientGradient"),
+            ("SOP: Curvature & Cavity", "SOP_Curvature"),
+            ("SOP: Stylized Damage (Chunky Notches)", "SOP_StylizedDamage"),
             ("SOP: Merge", "SOP_Merge"),
             ("VOP: NWShader (Spatial GLSL)", "VOP_NWShader"),
             ("VOP: Simplex Noise 3D (FBM)", "VOP_SimplexNoise3D"),
@@ -269,6 +296,10 @@ class PaintWeaveMainWindow(QMainWindow):
             ("VOP: Iso Sun Light", "VOP_IsoLight"),
             ("VOP: Rim Light", "VOP_RimLight"),
             ("VOP: Bayer 4x4 Dither", "VOP_BayerDither"),
+            ("VOP: Arcane Painterly Ramp", "VOP_ArcaneRamp"),
+            ("VOP: Hand-Painted Edge Glint", "VOP_EdgeGlint"),
+            ("VOP: Brush Stroke Impasto", "VOP_BrushImpasto"),
+            ("VOP: MatCap & Stylized Metal/Gem", "VOP_MatCap"),
         ]:
             act = QAction(label, self)
             act.triggered.connect(
@@ -298,6 +329,7 @@ class PaintWeaveMainWindow(QMainWindow):
         toolbar.addAction(act_cook)
 
         self.act_play = QAction("⏸ Pause Timeline", self)
+        self.act_play.setIconText("⏸ Pause")
         self.act_play.setCheckable(True)
         self.act_play.setChecked(True)
         self.act_play.toggled.connect(self._on_toggle_timeline_play)
@@ -305,12 +337,14 @@ class PaintWeaveMainWindow(QMainWindow):
 
         toolbar.addSeparator()
         act_mat_quick = QAction("🎨 + Assign Material SOP", self)
+        act_mat_quick.setIconText("🎨 + Material")
         act_mat_quick.triggered.connect(
             lambda: self._on_spawn_node_from_palette("SOP_Material")
         )
         toolbar.addAction(act_mat_quick)
 
         act_shader_quick = QAction("✨ + NWShader VOP", self)
+        act_shader_quick.setIconText("✨ + NWShader")
         act_shader_quick.triggered.connect(
             lambda: self._on_spawn_node_from_palette("VOP_NWShader")
         )
@@ -428,14 +462,30 @@ class PaintWeaveMainWindow(QMainWindow):
     # -------------------------------------------------------------------------
     # Edit / Undo / Redo / Clipboard Operations
     # -------------------------------------------------------------------------
+    def _rebind_selected_after_snapshot(self, prev_selected_id: str | None) -> None:
+        if prev_selected_id is not None:
+            restored = self.canvas_ctrl.core_graph.nodes.get(prev_selected_id)
+            self._on_node_selected(restored)
+        else:
+            self.inspector_widget.inspect_node(None)
+            self.code_studio.bind_node(None)
+
     def edit_undo(self) -> None:
+        prev_selected_id = (
+            self._selected_node.id if self._selected_node is not None else None
+        )
         if self.canvas_ctrl.undo():
+            self._rebind_selected_after_snapshot(prev_selected_id)
             self.status_bar.showMessage("Undo applied.", 2500)
         else:
             self.status_bar.showMessage("Nothing to undo.", 2000)
 
     def edit_redo(self) -> None:
+        prev_selected_id = (
+            self._selected_node.id if self._selected_node is not None else None
+        )
         if self.canvas_ctrl.redo():
+            self._rebind_selected_after_snapshot(prev_selected_id)
             self.status_bar.showMessage("Redo applied.", 2500)
         else:
             self.status_bar.showMessage("Nothing to redo.", 2000)
@@ -465,6 +515,7 @@ class PaintWeaveMainWindow(QMainWindow):
     def _on_toggle_timeline_play(self, playing: bool) -> None:
         self._timeline_playing = playing
         self.act_play.setText("⏸ Pause Timeline" if playing else "▶ Play Timeline")
+        self.act_play.setIconText("⏸ Pause" if playing else "▶ Play")
 
     def _on_timeline_tick(self) -> None:
         if not self._timeline_playing:
@@ -473,8 +524,8 @@ class PaintWeaveMainWindow(QMainWindow):
         if graph.has_animated_nodes():
             graph.mark_time_nodes_dirty()
             self.cook_active_network()
-        else:
-            # Still refresh viewport if any active shader uses the built-in TIME uniform
+        elif self.viewport.has_animated_shaders():
+            # Only redraw on idle ticks if an active shader references the TIME uniform
             self.viewport.update()
 
     def _on_spawn_node_from_palette(self, type_id: str) -> None:
@@ -528,7 +579,6 @@ class PaintWeaveMainWindow(QMainWindow):
         self.cook_active_network()
 
     def _on_bypass_flag_changed(self, _node_id: str, _bypassed: bool) -> None:
-        self.canvas_ctrl.push_undo_snapshot()
         self._is_modified = True
         self.canvas_ctrl.refresh_visual_badges()
         self.cook_active_network()
@@ -547,7 +597,6 @@ class PaintWeaveMainWindow(QMainWindow):
     def cook_active_network(self, force: bool = False) -> None:
         """Pull execution from active Display SOP, Template SOP, and fallback Display VOP."""
         graph = self.canvas_ctrl.core_graph
-        self.viewport.makeCurrent()
         try:
             sop_node = graph.cook_display_sop(force=force)
             template_node = graph.cook_template_sop()
@@ -611,13 +660,31 @@ class PaintWeaveMainWindow(QMainWindow):
                 "color: #ffffff; background-color: #991b1b; font-weight: bold;"
             )
             self.status_bar.showMessage(f"Cook Error: {exc}")
-        finally:
-            self.viewport.doneCurrent()
 
     # -------------------------------------------------------------------------
     # File I/O Actions
     # -------------------------------------------------------------------------
+    def _maybe_save_changes(self) -> bool:
+        """If the graph has unsaved modifications and window is visible, prompt user to Save/Discard/Cancel."""
+        if not (self._is_modified and self.isVisible()):
+            return True
+        reply = QMessageBox.question(
+            self,
+            "Unsaved Procedural Network Changes",
+            "The current procedural graph has unsaved modifications.\nDo you want to save before proceeding?",
+            QMessageBox.StandardButton.Save
+            | QMessageBox.StandardButton.Discard
+            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Save,
+        )
+        if reply == QMessageBox.StandardButton.Save:
+            self.file_save()
+            return not self._is_modified
+        return reply != QMessageBox.StandardButton.Cancel
+
     def file_new(self) -> None:
+        if not self._maybe_save_changes():
+            return
         self.current_file_path = None
         self._is_modified = False
         self.setWindowTitle("PaintWeave Studio v1.0.0 — [Untitled_Project.pw]")
@@ -630,6 +697,8 @@ class PaintWeaveMainWindow(QMainWindow):
         self.status_bar.showMessage("Created new empty procedural graph.")
 
     def file_open(self) -> None:
+        if not self._maybe_save_changes():
+            return
         filepath, _ = QFileDialog.getOpenFileName(
             self,
             "Open PaintWeave / NodeWeave Project",
@@ -637,9 +706,11 @@ class PaintWeaveMainWindow(QMainWindow):
             "Procedural Graphs (*.pw *.nw *.json);;All Files (*)",
         )
         if filepath:
-            self.load_project_file(Path(filepath))
+            self.load_project_file(Path(filepath), check_unsaved=False)
 
-    def load_project_file(self, filepath: Path) -> None:
+    def load_project_file(self, filepath: Path, check_unsaved: bool = True) -> None:
+        if check_unsaved and not self._maybe_save_changes():
+            return
         try:
             loaded_graph = Graph.load_from_file(str(filepath))
             self.current_file_path = str(filepath)
@@ -733,24 +804,9 @@ class PaintWeaveMainWindow(QMainWindow):
             QMessageBox.warning(self, "Render Export Error", str(exc))
 
     def closeEvent(self, event: QCloseEvent) -> None:
-        if self._is_modified and self.isVisible():
-            reply = QMessageBox.question(
-                self,
-                "Unsaved Procedural Network Changes",
-                "The current procedural graph has unsaved modifications.\nDo you want to save before exiting?",
-                QMessageBox.StandardButton.Save
-                | QMessageBox.StandardButton.Discard
-                | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Save,
-            )
-            if reply == QMessageBox.StandardButton.Save:
-                self.file_save()
-                if self._is_modified:
-                    event.ignore()
-                    return
-            elif reply == QMessageBox.StandardButton.Cancel:
-                event.ignore()
-                return
+        if not self._maybe_save_changes():
+            event.ignore()
+            return
         super().closeEvent(event)
 
     def show_about(self) -> None:
