@@ -485,21 +485,21 @@ class AmbientGradientSOPNode(NodeBase):
     PARAM_SPECS = [
         ParamSpec(
             "blend_mode",
-            "str",
+            "choice",
             "Multiply",
             label="Blend Mode",
             choices=["Multiply", "Tint", "Replace", "None (Attribute Only)"],
         ),
         ParamSpec(
             "tint_top",
-            "vec3",
+            "color",
             (1.0, 0.95, 0.85),
             label="Top Sky Tint",
             description="Warm top sunlight / sky highlight color.",
         ),
         ParamSpec(
             "tint_bottom",
-            "vec3",
+            "color",
             (0.40, 0.42, 0.58),
             label="Bottom Ground Tint",
             description="Cool ground bounce / slate shadow color.",
@@ -628,14 +628,14 @@ class CurvatureSOPNode(NodeBase):
         ),
         ParamSpec(
             "highlight_color",
-            "vec3",
+            "color",
             (1.0, 0.98, 0.92),
             label="Highlight Edge Color",
             description="Chalky gouache edge wear / bevel highlight color.",
         ),
         ParamSpec(
             "cavity_color",
-            "vec3",
+            "color",
             (0.18, 0.16, 0.22),
             label="Cavity Grime Color",
             description="Dark pooled grime / ambient shadow crevice color.",

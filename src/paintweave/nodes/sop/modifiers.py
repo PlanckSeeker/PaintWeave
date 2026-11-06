@@ -922,7 +922,7 @@ class StylizedDamageSOPNode(NodeBase):
             label="Tint Raw Chipped Core",
             description="Colors chipped gouges with freshly exposed core stone/wood pigment.",
         ),
-        ParamSpec("damage_color", "vec3", (0.88, 0.84, 0.78), label="Exposed Core Color"),
+        ParamSpec("damage_color", "color", (0.88, 0.84, 0.78), label="Exposed Core Color"),
     ]
 
     def evaluate(self) -> None:

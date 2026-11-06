@@ -95,6 +95,7 @@ in vec3 v_view;
 in vec4 v_light_space_pos;
 
 uniform float TIME;
+uniform vec3 u_camera_pos = vec3(11.5, 11.5, 11.5);
 uniform sampler2D u_shadow_map;
 uniform int u_shadow_enabled = 1;
 
@@ -146,7 +147,8 @@ void main() {{
     vec3 diffuse = ALBEDO * ndotl * s_factor;
 
     out_color = vec4(diffuse + EMISSION, 1.0);
-    out_normal_depth = vec4(NORMAL * 0.5 + 0.5, gl_FragCoord.z);
+    float lin_depth = length(u_camera_pos - v_world_pos) * 0.01;
+    out_normal_depth = vec4(NORMAL * 0.5 + 0.5, lin_depth);
 }}
 """
 

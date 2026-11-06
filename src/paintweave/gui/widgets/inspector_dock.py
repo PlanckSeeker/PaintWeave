@@ -164,9 +164,9 @@ class NodePropertyInspector(QWidget):
     def _create_editor(self, node: NodeBase, spec: ParamSpec) -> QWidget:
         val = node.params.get(spec.name, spec.default)
 
-        if spec.param_type in ("choice", "enum"):
+        if spec.param_type in ("choice", "enum") or bool(spec.choices) or bool(spec.options):
             cb = QComboBox()
-            cb.addItems(spec.choices or spec.options)
+            cb.addItems(spec.choices or spec.options or [])
             cb.setCurrentText(str(val))
             cb.currentTextChanged.connect(
                 lambda v, k=spec.name: self._update_param(k, v)

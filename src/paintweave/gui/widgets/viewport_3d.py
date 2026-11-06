@@ -32,11 +32,9 @@ void main() {
 
 GRID_FRAGMENT_SHADER = """#version 330 core
 uniform vec4 u_line_color;
-layout(location = 0) out vec4 out_color;
-layout(location = 1) out vec4 out_normal_depth;
+out vec4 frag_color;
 void main() {
-    out_color = u_line_color;
-    out_normal_depth = vec4(0.0, 1.0, 0.0, gl_FragCoord.z);
+    frag_color = u_line_color;
 }
 """
 
@@ -53,11 +51,9 @@ void main() {
 
 AXIS_FRAGMENT_SHADER = """#version 330 core
 in vec3 v_color;
-layout(location = 0) out vec4 out_color;
-layout(location = 1) out vec4 out_normal_depth;
+out vec4 frag_color;
 void main() {
-    out_color = vec4(v_color, 1.0);
-    out_normal_depth = vec4(0.5, 0.5, 0.5, gl_FragCoord.z);
+    frag_color = vec4(v_color, 1.0);
 }
 """
 
@@ -579,21 +575,7 @@ class Viewport3D(QOpenGLWidget):
             self.ctx.viewport = (0, 0, w, h)
             self.ctx.clear(0.055, 0.065, 0.088, 1.0)
 
-        # 1. Ground Grid & World Origin Axes
-        if self.show_grid:
-            if self.grid_vao is not None and self.grid_program is not None:
-                if "u_mvp" in self.grid_program:
-                    self.grid_program["u_mvp"].write(mvp_bytes)
-                if "u_line_color" in self.grid_program:
-                    self.grid_program["u_line_color"].value = (0.18, 0.22, 0.30, 0.65)
-                self.grid_vao.render(moderngl.LINES)
-
-            if self.axis_vao is not None and self.axis_program is not None:
-                if "u_mvp" in self.axis_program:
-                    self.axis_program["u_mvp"].write(mvp_bytes)
-                self.axis_vao.render(moderngl.LINES)
-
-        # 2. Render Active SOP Mesh (Multi-Material Batches or Wireframe)
+        # 1. Render Active SOP Mesh (Multi-Material Batches or Wireframe)
         shadow_active = (
             self.compositor.shadows_enabled if self.compositor else False
         )
@@ -618,7 +600,31 @@ class Viewport3D(QOpenGLWidget):
                 shadow_enabled=shadow_active,
             )
 
-        # 3. Render Pink Template / Ghost Reference SOP Wireframe if active
+        # PASS 3: Screen-Space Stylized Outline & Composite Pass (Target Screen FBO)
+        if self.compositor is not None:
+            self.compositor.composite_to_target(screen_fbo, w, h)
+
+        # PASS 4: Overlay Pass onto Screen FBO (Grid, Axes, Ghost Wireframe, Normals)
+        screen_fbo.use()
+        self.ctx.viewport = (0, 0, w, h)
+        self.ctx.enable(moderngl.BLEND)
+        self.ctx.blend_func = moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA
+
+        # Ground Grid & World Origin Axes
+        if self.show_grid:
+            if self.grid_vao is not None and self.grid_program is not None:
+                if "u_mvp" in self.grid_program:
+                    self.grid_program["u_mvp"].write(mvp_bytes)
+                if "u_line_color" in self.grid_program:
+                    self.grid_program["u_line_color"].value = (0.18, 0.22, 0.30, 0.65)
+                self.grid_vao.render(moderngl.LINES)
+
+            if self.axis_vao is not None and self.axis_program is not None:
+                if "u_mvp" in self.axis_program:
+                    self.axis_program["u_mvp"].write(mvp_bytes)
+                self.axis_vao.render(moderngl.LINES)
+
+        # Render Pink Template / Ghost Reference SOP Wireframe if active
         if (
             self.template_buffer is not None
             and self.template_buffer.index_count > 0
@@ -637,7 +643,7 @@ class Viewport3D(QOpenGLWidget):
             )
             self.ctx.wireframe = False
 
-        # 3b. Render Point Normal (@N) Hair Vectors if enabled
+        # Render Point Normal (@N) Hair Vectors if enabled
         if (
             self.show_normals
             and self.normals_vao is not None
@@ -649,10 +655,6 @@ class Viewport3D(QOpenGLWidget):
             if "u_line_color" in self.grid_program:
                 self.grid_program["u_line_color"].value = (0.22, 0.88, 0.98, 0.85)
             self.normals_vao.render(moderngl.LINES)
-
-        # PASS 3: Screen-Space Stylized Outline & Composite Pass (Target Screen FBO)
-        if self.compositor is not None:
-            self.compositor.composite_to_target(screen_fbo, w, h)
 
         # 4. Bottom-Right Corner Orientation Gizmo Pass
         gizmo_size = int(96 * dpr)
@@ -733,13 +735,6 @@ class Viewport3D(QOpenGLWidget):
                 self.ctx.viewport = (0, 0, width, height)
                 self.ctx.clear(0.055, 0.065, 0.088, 1.0)
 
-            if include_grid and self.grid_vao is not None and self.grid_program is not None:
-                if "u_mvp" in self.grid_program:
-                    self.grid_program["u_mvp"].write(mvp_bytes)
-                if "u_line_color" in self.grid_program:
-                    self.grid_program["u_line_color"].value = (0.18, 0.22, 0.30, 0.65)
-                self.grid_vao.render(moderngl.LINES)
-
             shadow_active = (
                 self.compositor.shadows_enabled if self.compositor else False
             )
@@ -755,6 +750,18 @@ class Viewport3D(QOpenGLWidget):
             # PASS 3: Composite Pass directly into export FBO
             if self.compositor is not None:
                 self.compositor.composite_to_target(fbo, width, height)
+
+            # PASS 4: Optional Grid Overlay on export
+            if include_grid and self.grid_vao is not None and self.grid_program is not None:
+                fbo.use()
+                self.ctx.viewport = (0, 0, width, height)
+                self.ctx.enable(moderngl.BLEND)
+                self.ctx.blend_func = moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA
+                if "u_mvp" in self.grid_program:
+                    self.grid_program["u_mvp"].write(mvp_bytes)
+                if "u_line_color" in self.grid_program:
+                    self.grid_program["u_line_color"].value = (0.18, 0.22, 0.30, 0.65)
+                self.grid_vao.render(moderngl.LINES)
 
             raw_bytes = fbo.read(components=4)
             img = Image.frombytes("RGBA", (width, height), raw_bytes)

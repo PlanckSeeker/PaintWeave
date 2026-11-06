@@ -118,7 +118,13 @@ class GPUMeshBuffer:
                 return False
             payload = materials_map.get(mid) if mid >= 0 else None
             active_payload = payload if payload is not None else default_shader
-            if batch.shader_payload != active_payload:
+            if batch.shader_payload is not None and active_payload is not None:
+                if (
+                    batch.shader_payload.vertex_src != active_payload.vertex_src
+                    or batch.shader_payload.fragment_body != active_payload.fragment_body
+                ):
+                    return False
+            elif batch.shader_payload != active_payload:
                 return False
 
         return True
@@ -183,6 +189,8 @@ class GPUMeshBuffer:
                     mid = int(mid_val)
                     sub_tris = np.ascontiguousarray(tris[mat_ids == mid], dtype=np.uint32)
                     self.batches[idx].ebo.write(sub_tris.tobytes())
+                    payload = materials_map.get(mid) if mid >= 0 else None
+                    self.batches[idx].shader_payload = payload if payload is not None else default_shader
             return errors
 
         # Topology or batch configuration changed: full buffer allocation

@@ -41,6 +41,7 @@ in vec4 v_light_space_pos;
 
 uniform sampler2D u_shadow_map;
 uniform int u_shadow_enabled = 1;
+uniform vec3 u_camera_pos = vec3(11.5, 11.5, 11.5);
 
 layout(location = 0) out vec4 out_color;
 layout(location = 1) out vec4 out_normal_depth;
@@ -75,7 +76,8 @@ void main() {
     float s_factor = calc_shadow(v_light_space_pos, N, light_dir);
     vec3 shaded = v_color * (amb + key * 0.85 * s_factor + fill);
     out_color = vec4(shaded, 1.0);
-    out_normal_depth = vec4(N * 0.5 + 0.5, gl_FragCoord.z);
+    float lin_depth = length(u_camera_pos - v_world_pos) * 0.01;
+    out_normal_depth = vec4(N * 0.5 + 0.5, lin_depth);
 }
 """
 
@@ -175,6 +177,7 @@ float calc_shadow(vec4 light_space_pos, vec3 normal, vec3 light_dir) {
             "    float s_factor = calc_shadow(v_light_space_pos, N, light_dir);\n"
             "    vec3 shaded_final = mix(final_rgb * 0.35, final_rgb, s_factor);\n"
             "    out_color = vec4(shaded_final, 1.0);\n"
-            "    out_normal_depth = vec4(N * 0.5 + 0.5, gl_FragCoord.z);\n"
+            "    float lin_depth = length(u_camera_pos - v_world_pos) * 0.01;\n"
+            "    out_normal_depth = vec4(N * 0.5 + 0.5, lin_depth);\n"
             "}\n"
         )

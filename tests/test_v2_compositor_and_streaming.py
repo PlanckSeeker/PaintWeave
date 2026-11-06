@@ -186,3 +186,77 @@ def test_vop_shader_payload_mrt_and_shadow_integration() -> None:
     assert "u_shadow_map" in prog
     assert "u_light_space_matrix" in prog
     prog.release()
+
+
+def test_remnants_fixes_rem01_to_rem05() -> None:
+    """Verify bug fixes for REM-01 through REM-05."""
+    from paintweave.engine.shader.nwshader import MASTER_FRAGMENT_TEMPLATE
+    from paintweave.gui.widgets.viewport_3d import GRID_FRAGMENT_SHADER
+    from paintweave.nodes.sop.attributes import AmbientGradientSOPNode, CurvatureSOPNode
+    from paintweave.nodes.sop.modifiers import StylizedDamageSOPNode
+
+    # REM-01 & REM-02: Check ParamSpecs
+    amb_specs = {s.name: s for s in AmbientGradientSOPNode.PARAM_SPECS}
+    assert amb_specs["blend_mode"].param_type == "choice"
+    assert amb_specs["tint_top"].param_type == "color"
+    assert amb_specs["tint_bottom"].param_type == "color"
+
+    curv_specs = {s.name: s for s in CurvatureSOPNode.PARAM_SPECS}
+    assert curv_specs["highlight_color"].param_type == "color"
+    assert curv_specs["cavity_color"].param_type == "color"
+
+    dmg_specs = {s.name: s for s in StylizedDamageSOPNode.PARAM_SPECS}
+    assert dmg_specs["damage_color"].param_type == "color"
+
+    # REM-03: Fast-path in-place streaming when only uniforms change
+    ctx = _create_standalone_context()
+    mesh_buf = GPUMeshBuffer(ctx)
+    default_prog = ctx.program(
+        vertex_shader=DEFAULT_VERTEX_SHADER,
+        fragment_shader=DEFAULT_FRAGMENT_SHADER,
+    )
+    payload_a = ShaderPayload(
+        name="TestA",
+        fragment_body="vec3 final_rgb = vec3(u_val);\n",
+        uniforms={"u_val": ("float", 1.0)},
+    )
+    geo = Geometry()
+    geo.points["P"] = np.array(
+        [[-1, 0, -1], [1, 0, -1], [1, 0, 1], [-1, 0, 1]], dtype=np.float32
+    )
+    geo.points["N"] = np.array(
+        [[0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0]], dtype=np.float32
+    )
+    geo.primitives["triangles"] = np.array(
+        [[0, 1, 2], [0, 2, 3]], dtype=np.uint32
+    )
+    geo.primitives["material_id"] = np.zeros(2, dtype=np.int32)
+    geo.detail["materials"] = {0: payload_a}
+    mesh_buf.upload(geo, default_prog)
+    assert len(mesh_buf.batches) == 1
+    vbo_p_before = mesh_buf.vbo_p
+
+    # Scrub uniform: payload_b has different uniform value but same vertex_src & fragment_body
+    payload_b = ShaderPayload(
+        name="TestA",
+        fragment_body="vec3 final_rgb = vec3(u_val);\n",
+        uniforms={"u_val": ("float", 2.5)},
+    )
+    geo.detail["materials"] = {0: payload_b}
+    mesh_buf.upload(geo, default_prog)
+    assert mesh_buf.vbo_p is vbo_p_before
+    assert mesh_buf.batches[0].shader_payload.uniforms["u_val"][1] == 2.5
+
+    # REM-04: GRID_FRAGMENT_SHADER must NOT write to MRT location 1
+    assert "location = 1" not in GRID_FRAGMENT_SHADER
+    assert "out_normal_depth" not in GRID_FRAGMENT_SHADER
+
+    # REM-05: Linear depth in DEFAULT_FRAGMENT_SHADER, build_fragment_shader, and nwshader
+    assert "float lin_depth = length(u_camera_pos - v_world_pos) * 0.01;" in DEFAULT_FRAGMENT_SHADER
+    assert "u_camera_pos" in DEFAULT_FRAGMENT_SHADER
+    built_frag = payload_b.build_fragment_shader()
+    assert "float lin_depth = length(u_camera_pos - v_world_pos) * 0.01;" in built_frag
+    assert "float lin_depth = length(u_camera_pos - v_world_pos) * 0.01;" in MASTER_FRAGMENT_TEMPLATE
+
+    mesh_buf.release()
+    default_prog.release()
