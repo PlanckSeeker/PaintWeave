@@ -66,3 +66,39 @@ def test_examples_cook_and_main_window_initializes() -> None:
     assert len(ctrl.node_graph.viewer().all_pipes()) == len(ctrl.core_graph.links)
 
     window.close()
+
+
+def test_artificers_atelier_ui_components() -> None:
+    """Verify Artificer's Atelier theme titles, swatches, and ArtificerCodeEditor."""
+    from paintweave.gui.widgets.code_studio import ArtificerCodeEditor
+    from paintweave.gui.widgets.inspector_dock import ARTIFICER_SWATCHES
+
+    app = QApplication.instance() or QApplication([])
+    assert app is not None
+
+    window = PaintWeaveMainWindow()
+    assert "Artificer's Atelier" in window.windowTitle()
+    assert "Operator Catalog" in window.dock_palette.windowTitle()
+    assert "Transmutation Matrix" in window.dock_inspector.windowTitle()
+    assert "Atelier Workbench" in window.dock_workbench.windowTitle()
+
+    # Code Studio: ArtificerCodeEditor with Line Numbers & Error Highlighting
+    editor = window.code_studio.source_editor
+    assert isinstance(editor, ArtificerCodeEditor)
+    assert editor.line_number_area_width() >= 32
+
+    editor.setPlainText("line 1\nline 2\nline 3\nline 4\nline 5\n")
+    editor.highlight_error_line(3)
+    assert editor._error_line == 3
+    # Typing in editor clears error line
+    editor.insertPlainText(" ")
+    assert editor._error_line is None
+
+    # Inspector Swatches
+    assert len(ARTIFICER_SWATCHES) >= 8
+    for hex_code, title in ARTIFICER_SWATCHES:
+        assert hex_code.startswith("#")
+        assert len(hex_code) == 7
+        assert len(title) > 0
+
+    window.close()

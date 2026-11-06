@@ -17,9 +17,9 @@ from paintweave.core.datatypes import NodeContext
 from paintweave.core.registry import GLOBAL_NODE_REGISTRY
 
 CONTEXT_ACCENT_COLORS = {
-    NodeContext.SOP: "#34d399",  # Mint Emerald
-    NodeContext.VOP: "#c084fc",  # Glowing Violet
-    NodeContext.MATH: "#38bdf8",  # Laser Cyan
+    NodeContext.SOP: "#34d399",  # Alchemical Emerald
+    NodeContext.VOP: "#c084fc",  # Arcane Amethyst
+    NodeContext.MATH: "#f59e0b",  # Celestial Amber
 }
 
 

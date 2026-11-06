@@ -20,30 +20,30 @@ from paintweave.core.registry import (
 )
 from paintweave.nodes import register_all_nodes
 
-# Node header colors (R, G, B) by (Context, Category)
+# Node header colors (R, G, B) by (Context, Category) - Artificer's Atelier Palette
 CATEGORY_COLORS: dict[str, tuple[int, int, int]] = {
-    "Primitives": (20, 108, 92),  # Teal Emerald
-    "Modifiers": (30, 88, 148),  # Cobalt Blue
-    "Attributes & Groups": (42, 112, 128),  # Cyan Slate
-    "Instancing & Topology": (22, 120, 78),  # Forest Green
-    "Materials & Shading": (126, 34, 206),  # Deep Royal Purple
-    "Lighting": (109, 40, 217),  # Violet
-    "Patterns": (147, 51, 234),  # Orchid Purple
-    "Post & Stylized": (162, 28, 175),  # Magenta Violet
-    "Programmable Shaders": (190, 24, 93),  # Crimson Rose
-    "Scalars & Vectors": (51, 65, 85),  # Cool Slate
-    "Arithmetic": (71, 85, 105),  # Steel Slate
-    "Animation & Oscillators": (180, 83, 9),  # Amber Gold
+    "Primitives": (18, 115, 96),  # Alchemical Malachite
+    "Modifiers": (28, 96, 160),  # Cobalt Brass
+    "Attributes & Groups": (36, 122, 142),  # Ether Slate
+    "Instancing & Topology": (22, 128, 84),  # Emerald
+    "Materials & Shading": (138, 43, 226),  # Arcane Amethyst
+    "Lighting": (124, 58, 237),  # Ether Violet
+    "Patterns": (168, 85, 247),  # Radiant Orchid
+    "Post & Stylized": (192, 38, 211),  # Magenta Glaze
+    "Programmable Shaders": (190, 24, 93),  # Philosopher's Crimson
+    "Scalars & Vectors": (55, 68, 88),  # Polished Steel
+    "Arithmetic": (75, 88, 108),  # Slate
+    "Animation & Oscillators": (217, 119, 6),  # Celestial Amber
 }
 
-# Port colors (R, G, B) by DataType
+# Port colors (R, G, B) by DataType - Glowing Conduit Spectrum
 PORT_TYPE_COLORS: dict[DataType, tuple[int, int, int]] = {
     DataType.GEOMETRY: (52, 211, 153),  # Mint Emerald (SOP Geometry stream)
-    DataType.SHADER: (192, 132, 252),  # Glowing Violet (VOP Shader stream)
+    DataType.SHADER: (192, 132, 252),  # Glowing Amethyst (VOP Shader stream)
     DataType.FLOAT: (56, 189, 248),  # Laser Cyan
     DataType.INT: (96, 165, 250),  # Sky Blue
-    DataType.VEC3: (251, 146, 60),  # Warm Amber
-    DataType.ANY: (148, 163, 184),  # Neutral Silver
+    DataType.VEC3: (245, 158, 11),  # Warm Amber / Solar Gold
+    DataType.ANY: (160, 174, 192),  # Polished Silver
 }
 
 
@@ -87,8 +87,8 @@ class PaintWeaveCanvasController:
         register_all_nodes()
         self.node_graph = NodeGraph()
         self.node_graph.set_pipe_style(PipeLayoutEnum.CURVED.value)
-        self.node_graph.set_background_color(13, 16, 22)
-        self.node_graph.set_grid_color(28, 35, 49)
+        self.node_graph.set_background_color(10, 13, 20)
+        self.node_graph.set_grid_color(21, 30, 46)
 
         self.core_graph = Graph(name="Untitled_Diorama")
         self._visual_to_uid: dict[str, str] = {}

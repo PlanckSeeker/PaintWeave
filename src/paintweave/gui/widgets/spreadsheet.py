@@ -130,7 +130,7 @@ class GeometrySpreadsheet(QWidget):
         self.filter_edit.textChanged.connect(self._refresh_table)
 
         self.summary_label = QLabel("Pts: 0  |  Prims: 0  |  Mats: 0")
-        self.summary_label.setStyleSheet("color: #38bdf8; font-weight: 600;")
+        self.summary_label.setStyleSheet("color: #e5b869; font-weight: 700; font-family: Consolas, monospace;")
 
         top_bar.addWidget(QLabel("Domain:"))
         top_bar.addWidget(self.domain_combo)

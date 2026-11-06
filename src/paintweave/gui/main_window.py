@@ -38,7 +38,7 @@ class PaintWeaveMainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle(
-            "PaintWeave Studio v1.0.0 — Procedural Geometry (SOP) & Multi-Material Shader (VOP) IDE"
+            "PaintWeave — Artificer's Atelier (Procedural SOP & Stylized Shader IDE)"
         )
         screen = self.screen()
         if screen is not None:
@@ -136,11 +136,11 @@ class PaintWeaveMainWindow(QMainWindow):
         self.code_studio.code_applied.connect(self._on_node_param_changed)
 
         self.workbench_tabs.addTab(
-            self.spreadsheet_panel, "📊 Geometry & Material Spreadsheet"
+            self.spreadsheet_panel, "📜 Geometry & Material Ledger"
         )
-        self.workbench_tabs.addTab(self.code_studio, "💻 Wrangle & NWShader Studio")
+        self.workbench_tabs.addTab(self.code_studio, "⚙️ Spellcraft & Shader Studio")
         self.workbench_tabs.addTab(
-            self.telemetry_panel, "⏱️ Cook Profiler & CUDA Telemetry"
+            self.telemetry_panel, "⚡ Alchemical Profiler & Telemetry"
         )
 
     def _init_docks(self) -> None:
@@ -151,20 +151,20 @@ class PaintWeaveMainWindow(QMainWindow):
         )
 
         # Left Dock: Operator Palette
-        self.dock_palette = QDockWidget("Operator Catalog (SOP / VOP / Math)", self)
+        self.dock_palette = QDockWidget("⚗️ Operator Catalog (SOP / VOP / Math)", self)
         self.dock_palette.setWidget(self.palette_widget)
         self.dock_palette.setMinimumWidth(220)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.dock_palette)
 
         # Right Dock: Parameter Inspector
-        self.dock_inspector = QDockWidget("Node Parameter Inspector", self)
+        self.dock_inspector = QDockWidget("🎛️ Transmutation Matrix (Inspector)", self)
         self.dock_inspector.setWidget(self.inspector_widget)
         self.dock_inspector.setMinimumWidth(290)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock_inspector)
 
         # Bottom Dock: Spreadsheet, Code Studio & Telemetry
         self.dock_workbench = QDockWidget(
-            "Geometry Spreadsheet, Shader Studio & Telemetry", self
+            "📜 Atelier Workbench (Ledger, Spellcraft & Profiler)", self
         )
         self.dock_workbench.setWidget(self.workbench_tabs)
         self.dock_workbench.setMinimumHeight(250)
@@ -373,7 +373,9 @@ class PaintWeaveMainWindow(QMainWindow):
         self.device_badge = QLabel(
             f"  {get_compute_summary()}  |  OpenGL 4.3 Core MSAAx4  "
         )
-        self.device_badge.setStyleSheet("color: #38bdf8; font-weight: 600;")
+        self.device_badge.setStyleSheet(
+            "color: #e5b869; font-weight: 700; font-family: Consolas, monospace;"
+        )
         self.status_bar.addPermanentWidget(self.device_badge)
         self.status_bar.showMessage(
             "Ready — Double-click any node on the canvas to set its Display Flag, press Tab on the canvas for quick search, or double-click in the left Palette."
@@ -687,7 +689,7 @@ class PaintWeaveMainWindow(QMainWindow):
             return
         self.current_file_path = None
         self._is_modified = False
-        self.setWindowTitle("PaintWeave Studio v1.0.0 — [Untitled_Project.pw]")
+        self.setWindowTitle("PaintWeave — Artificer's Atelier [Untitled_Project.pw]")
         self.canvas_ctrl.clear()
         self.viewport.update_scene(None, None)
         self.spreadsheet_panel.set_geometry(None)
@@ -715,7 +717,7 @@ class PaintWeaveMainWindow(QMainWindow):
             loaded_graph = Graph.load_from_file(str(filepath))
             self.current_file_path = str(filepath)
             self._is_modified = False
-            self.setWindowTitle(f"PaintWeave Studio v1.0.0 — [{filepath.name}]")
+            self.setWindowTitle(f"PaintWeave — Artificer's Atelier [{filepath.name}]")
             self.canvas_ctrl.load_graph(loaded_graph)
             self.cook_active_network(force=True)
             self.status_bar.showMessage(
@@ -738,7 +740,7 @@ class PaintWeaveMainWindow(QMainWindow):
                 filepath += ".pw"
             self.current_file_path = filepath
             self.setWindowTitle(
-                f"PaintWeave Studio v1.0.0 — [{os.path.basename(filepath)}]"
+                f"PaintWeave — Artificer's Atelier [{os.path.basename(filepath)}]"
             )
 
         try:

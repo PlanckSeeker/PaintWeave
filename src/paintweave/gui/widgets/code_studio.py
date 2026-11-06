@@ -4,15 +4,17 @@ from __future__ import annotations
 
 import re
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QRect, QSize, Qt, Signal
 from PySide6.QtGui import (
     QColor,
     QFont,
     QKeySequence,
+    QPainter,
     QShortcut,
     QSyntaxHighlighter,
     QTextCharFormat,
     QTextDocument,
+    QTextFormat,
 )
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -20,6 +22,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QSplitter,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -85,10 +88,181 @@ class PaintWeaveSyntaxHighlighter(QSyntaxHighlighter):
                 self.setFormat(start, end - start, fmt)
 
 
+class LineNumberArea(QWidget):
+    """Gutter widget displaying line numbers for ArtificerCodeEditor."""
+
+    def __init__(self, editor: ArtificerCodeEditor) -> None:
+        super().__init__(editor)
+        self.editor = editor
+
+    def sizeHint(self) -> QSize:
+        return QSize(self.editor.line_number_area_width(), 0)
+
+    def paintEvent(self, event) -> None:  # type: ignore[override]
+        self.editor.line_number_area_paint_event(event)
+
+
+class ArtificerCodeEditor(QPlainTextEdit):
+    """
+    Precision code editor for Wrangle & NWShader scripts with:
+      - Line numbers gutter painted in antique brass gold
+      - Smart 4-space Tab and Shift+Tab indentation
+      - Auto-indentation on Return
+      - Inline error line indicator highlighting
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.line_number_area = LineNumberArea(self)
+        self._error_line: int | None = None
+
+        self.blockCountChanged.connect(self._update_line_number_area_width)
+        self.updateRequest.connect(self._update_line_number_area)
+        self.cursorPositionChanged.connect(self._highlight_current_line)
+        self.textChanged.connect(self._on_text_changed)
+
+        self._update_line_number_area_width(0)
+        self._highlight_current_line()
+
+    def _on_text_changed(self) -> None:
+        if self._error_line is not None:
+            self._error_line = None
+            self._highlight_current_line()
+            self.line_number_area.update()
+
+    def highlight_error_line(self, line_num: int | None) -> None:
+        self._error_line = line_num
+        self._highlight_current_line()
+        self.line_number_area.update()
+        if line_num is not None:
+            doc = self.document()
+            block = doc.findBlockByLineNumber(max(0, line_num - 1))
+            if block.isValid():
+                cursor = self.textCursor()
+                cursor.setPosition(block.position())
+                self.setTextCursor(cursor)
+                self.centerCursor()
+
+    def line_number_area_width(self) -> int:
+        digits = max(1, len(str(max(1, self.blockCount()))))
+        space = 14 + self.fontMetrics().horizontalAdvance("9") * digits
+        return max(32, space)
+
+    def _update_line_number_area_width(self, _new_block_count: int) -> None:
+        self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
+
+    def _update_line_number_area(self, rect: QRect, dy: int) -> None:
+        if dy:
+            self.line_number_area.scroll(0, dy)
+        else:
+            self.line_number_area.update(0, rect.y(), self.line_number_area.width(), rect.height())
+        if rect.contains(self.viewport().rect()):
+            self._update_line_number_area_width(0)
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        cr = self.contentsRect()
+        self.line_number_area.setGeometry(QRect(cr.left(), cr.top(), self.line_number_area_width(), cr.height()))
+
+    def _highlight_current_line(self) -> None:
+        extra_selections: list[QTextEdit.ExtraSelection] = []
+        if not self.isReadOnly():
+            selection = QTextEdit.ExtraSelection()
+            line_color = QColor("#1e293b")
+            line_color.setAlpha(60)
+            selection.format.setBackground(line_color)
+            selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
+            selection.cursor = self.textCursor()
+            selection.cursor.clearSelection()
+            extra_selections.append(selection)
+
+        if self._error_line is not None and self._error_line > 0:
+            err_selection = QTextEdit.ExtraSelection()
+            err_color = QColor("#7f1d1d")
+            err_color.setAlpha(120)
+            err_selection.format.setBackground(err_color)
+            err_selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
+            doc = self.document()
+            block = doc.findBlockByLineNumber(self._error_line - 1)
+            if block.isValid():
+                err_cursor = self.textCursor()
+                err_cursor.setPosition(block.position())
+                err_selection.cursor = err_cursor
+                extra_selections.append(err_selection)
+
+        self.setExtraSelections(extra_selections)
+
+    def line_number_area_paint_event(self, event) -> None:
+        painter = QPainter(self.line_number_area)
+        painter.fillRect(event.rect(), QColor("#090d14"))
+
+        # Hairline brass separator rule
+        painter.setPen(QColor(198, 146, 60, 60))
+        painter.drawLine(event.rect().topRight(), event.rect().bottomRight())
+
+        block = self.firstVisibleBlock()
+        block_number = block.blockNumber()
+        top = int(self.blockBoundingGeometry(block).translated(self.contentOffset()).top())
+        bottom = top + int(self.blockBoundingRect(block).height())
+
+        while block.isValid() and top <= event.rect().bottom():
+            if block.isVisible() and bottom >= event.rect().top():
+                number = str(block_number + 1)
+                is_error = self._error_line == (block_number + 1)
+                if is_error:
+                    painter.fillRect(2, top + 2, 4, bottom - top - 4, QColor("#ef4444"))
+                    painter.setPen(QColor("#fca5a5"))
+                else:
+                    painter.setPen(QColor("#c6923c") if not self.isReadOnly() else QColor("#64748b"))
+
+                painter.setFont(self.font())
+                painter.drawText(
+                    0,
+                    top,
+                    self.line_number_area.width() - 8,
+                    self.fontMetrics().height(),
+                    Qt.AlignmentFlag.AlignRight,
+                    number,
+                )
+
+            block = block.next()
+            top = bottom
+            bottom = top + int(self.blockBoundingRect(block).height())
+            block_number += 1
+
+    def keyPressEvent(self, event) -> None:  # type: ignore[override]
+        if event.key() == Qt.Key.Key_Tab:
+            self.insertPlainText("    ")
+            event.accept()
+            return
+        if event.key() == Qt.Key.Key_Backtab:
+            cursor = self.textCursor()
+            cursor.movePosition(cursor.MoveOperation.StartOfLine, cursor.MoveMode.MoveAnchor)
+            line_text = cursor.block().text()
+            if line_text.startswith("    "):
+                cursor.movePosition(cursor.MoveOperation.Right, cursor.MoveMode.KeepAnchor, 4)
+                cursor.removeSelectedText()
+            elif line_text.startswith("\t"):
+                cursor.movePosition(cursor.MoveOperation.Right, cursor.MoveMode.KeepAnchor, 1)
+                cursor.removeSelectedText()
+            event.accept()
+            return
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            cursor = self.textCursor()
+            line_text = cursor.block().text()
+            leading_spaces = len(line_text) - len(line_text.lstrip(" "))
+            super().keyPressEvent(event)
+            if leading_spaces > 0:
+                self.insertPlainText(" " * leading_spaces)
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+
 class CodeStudioPanel(QWidget):
     """
     Side-by-side Code Workbench for `SOP_Wrangle`, `VOP_Wrangle`, and `VOP_NWShader`:
-      - Left pane: Editable Python/NumPy/PyTorch or GLSL/NWShader script
+      - Left pane: Editable Python/NumPy/PyTorch or GLSL/NWShader script with line numbers & error pinning
       - Right pane: Read-only live compiled GLSL Vertex & Fragment shader output or status diagnostics
     """
 
@@ -108,9 +282,9 @@ class CodeStudioPanel(QWidget):
         self.title_lbl = QLabel(
             "Select a Wrangle or NWShader node to edit code, or inspect any VOP's generated GLSL"
         )
-        self.title_lbl.setStyleSheet("color: #38bdf8; font-weight: 700;")
+        self.title_lbl.setStyleSheet("color: #e5b869; font-weight: 700; font-size: 12px;")
 
-        self.apply_btn = QPushButton("⚡ Apply & Cook (Ctrl+Enter)")
+        self.apply_btn = QPushButton("⚡ Attune & Cook (Ctrl+Enter)")
         self.apply_btn.setObjectName("PrimaryActionBtn")
         self.apply_btn.setEnabled(False)
         self.apply_btn.clicked.connect(self._apply_current_code)
@@ -126,10 +300,12 @@ class CodeStudioPanel(QWidget):
         left_box = QWidget()
         left_lay = QVBoxLayout(left_box)
         left_lay.setContentsMargins(0, 0, 0, 0)
-        left_lay.addWidget(QLabel("✏️ Source Script (Python / NWShader / GLSL):"))
-        self.source_editor = QPlainTextEdit()
+        lbl_src = QLabel("📜 Source Script (Python Wrangle / NWShader / GLSL):")
+        lbl_src.setStyleSheet("color: #e5b869; font-weight: 600;")
+        left_lay.addWidget(lbl_src)
+        self.source_editor = ArtificerCodeEditor()
         self.source_editor.setStyleSheet(
-            "font-family: Consolas, 'JetBrains Mono', monospace; font-size: 12px; background-color: #0b0d13;"
+            "font-family: Consolas, 'JetBrains Mono', monospace; font-size: 12px; background-color: #080b12; border: 1px solid rgba(198, 146, 60, 0.35);"
         )
         self.source_editor.setPlaceholderText(
             "Select SOP_Wrangle, VOP_Wrangle, or VOP_NWShader to edit source code..."
@@ -140,11 +316,13 @@ class CodeStudioPanel(QWidget):
         right_box = QWidget()
         right_lay = QVBoxLayout(right_box)
         right_lay.setContentsMargins(0, 0, 0, 0)
-        right_lay.addWidget(QLabel("🔍 Compiled GLSL / Execution Output:"))
-        self.glsl_preview = QPlainTextEdit()
+        lbl_out = QLabel("🔍 Compiled Ledger / Output:")
+        lbl_out.setStyleSheet("color: #38bdf8; font-weight: 600;")
+        right_lay.addWidget(lbl_out)
+        self.glsl_preview = ArtificerCodeEditor()
         self.glsl_preview.setReadOnly(True)
         self.glsl_preview.setStyleSheet(
-            "font-family: Consolas, 'JetBrains Mono', monospace; font-size: 11px; color: #a5f3fc; background-color: #090b10;"
+            "font-family: Consolas, 'JetBrains Mono', monospace; font-size: 11px; color: #a5f3fc; background-color: #06080e; border: 1px solid rgba(56, 189, 248, 0.25);"
         )
         right_lay.addWidget(self.glsl_preview, stretch=1)
 
@@ -197,11 +375,23 @@ class CodeStudioPanel(QWidget):
         node = self._current_node
         if node is None:
             self.glsl_preview.clear()
+            self.source_editor.highlight_error_line(None)
             return
 
         if node.error_message:
             self.glsl_preview.setPlainText(f"❌ ERROR:\n{node.error_message}")
+            m = re.search(
+                r"(?:line\s*(\d+)|\b0\((\d+)\)\s*:|\b(\d+)\s*:\s*(?:error|warning))",
+                node.error_message,
+                re.IGNORECASE,
+            )
+            if m:
+                line_str = m.group(1) or m.group(2) or m.group(3)
+                if line_str:
+                    self.source_editor.highlight_error_line(int(line_str))
             return
+
+        self.source_editor.highlight_error_line(None)
 
         if "Shader" in node.outputs and isinstance(
             node.outputs["Shader"].value, ShaderPayload

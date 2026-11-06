@@ -29,6 +29,20 @@ from PySide6.QtWidgets import (
 from paintweave.core.base_node import NodeBase
 from paintweave.core.datatypes import CodeString, NodeContext, ParamSpec
 
+# Curated Artificer & Stylized Color Swatches
+ARTIFICER_SWATCHES: list[tuple[str, str]] = [
+    ("#1ca7d8", "Hextech Azure"),
+    ("#f2b744", "Burnished Gold"),
+    ("#7a1734", "Crimson Shadow"),
+    ("#2dd4bf", "Ether Mint"),
+    ("#78b159", "Ghibli Meadow"),
+    ("#e8a838", "Sunlight Ochre"),
+    ("#c85a48", "Terracotta"),
+    ("#f0c27b", "Dune Sand"),
+    ("#8e6c88", "Amethyst Haze"),
+    ("#121214", "Void Obsidian"),
+]
+
 
 class NodePropertyInspector(QWidget):
     """Dynamic property editor auto-generated from `NodeBase.all_param_specs()`."""
@@ -51,7 +65,7 @@ class NodePropertyInspector(QWidget):
         # Header Block
         self.header_lbl = QLabel("No Node Selected")
         self.header_lbl.setStyleSheet(
-            "color: #38bdf8; font-weight: 700; font-size: 13px;"
+            "color: #e5b869; font-weight: 700; font-size: 13px; letter-spacing: 0.3px;"
         )
         layout.addWidget(self.header_lbl)
 
@@ -262,8 +276,9 @@ class NodePropertyInspector(QWidget):
 
         if spec.param_type == "color":
             container = QWidget()
-            hbox = QHBoxLayout(container)
-            hbox.setContentsMargins(0, 0, 0, 0)
+            vbox = QVBoxLayout(container)
+            vbox.setContentsMargins(0, 0, 0, 0)
+            vbox.setSpacing(4)
 
             tup = (
                 val
@@ -278,7 +293,7 @@ class NodePropertyInspector(QWidget):
 
             color_btn = QPushButton(current_color.name())
             color_btn.setStyleSheet(
-                f"background-color: {current_color.name()}; color: #0e1015; font-weight: bold; border: 1px solid #cbd5e1;"
+                f"background-color: {current_color.name()}; color: {'#000000' if current_color.lightnessF() > 0.5 else '#ffffff'}; font-weight: bold; border: 1px solid rgba(198, 146, 60, 0.5); border-radius: 4px;"
             )
             color_btn.setFixedHeight(26)
 
@@ -294,12 +309,39 @@ class NodePropertyInspector(QWidget):
                     new_tup = (new_color.redF(), new_color.greenF(), new_color.blueF())
                     btn.setText(new_color.name())
                     btn.setStyleSheet(
-                        f"background-color: {new_color.name()}; color: #0e1015; font-weight: bold; border: 1px solid #cbd5e1;"
+                        f"background-color: {new_color.name()}; color: {'#000000' if new_color.lightnessF() > 0.5 else '#ffffff'}; font-weight: bold; border: 1px solid rgba(198, 146, 60, 0.5); border-radius: 4px;"
                     )
                     self._update_param(k, new_tup)
 
             color_btn.clicked.connect(pick_color)
-            hbox.addWidget(color_btn)
+            vbox.addWidget(color_btn)
+
+            # Artificer Quick-Swatch Chips
+            swatch_row = QHBoxLayout()
+            swatch_row.setContentsMargins(0, 0, 0, 0)
+            swatch_row.setSpacing(4)
+            for hex_code, swatch_title in ARTIFICER_SWATCHES:
+                chip = QPushButton()
+                chip.setFixedSize(16, 16)
+                chip.setCursor(Qt.CursorShape.PointingHandCursor)
+                chip.setToolTip(f"{swatch_title} ({hex_code})")
+                chip.setStyleSheet(
+                    f"background-color: {hex_code}; border: 1px solid rgba(198, 146, 60, 0.45); border-radius: 3px;"
+                )
+                def make_chip_handler(h: str, btn: QPushButton = color_btn, k: str = spec.name):
+                    def handler(_checked: bool = False) -> None:
+                        qc = QColor(h)
+                        tup_val = (qc.redF(), qc.greenF(), qc.blueF())
+                        btn.setText(qc.name())
+                        btn.setStyleSheet(
+                            f"background-color: {qc.name()}; color: {'#000000' if qc.lightnessF() > 0.5 else '#ffffff'}; font-weight: bold; border: 1px solid rgba(198, 146, 60, 0.5); border-radius: 4px;"
+                        )
+                        self._update_param(k, tup_val)
+                    return handler
+                chip.clicked.connect(make_chip_handler(hex_code))
+                swatch_row.addWidget(chip)
+            swatch_row.addStretch(1)
+            vbox.addLayout(swatch_row)
             return container
 
         if spec.param_type == "filepath":

@@ -21,10 +21,10 @@ class CookTelemetryPanel(QWidget):
 
         header = QHBoxLayout()
         self.total_lbl = QLabel("Total Network Cook Time: 0.00 ms")
-        self.total_lbl.setStyleSheet("color: #38bdf8; font-weight: 700;")
+        self.total_lbl.setStyleSheet("color: #e5b869; font-weight: 700; font-family: Consolas, monospace;")
 
         self.gpu_lbl = QLabel(get_compute_summary())
-        self.gpu_lbl.setStyleSheet("color: #34d399; font-weight: 600;")
+        self.gpu_lbl.setStyleSheet("color: #38bdf8; font-weight: 600;")
 
         header.addWidget(self.total_lbl)
         header.addStretch(1)
@@ -33,7 +33,7 @@ class CookTelemetryPanel(QWidget):
 
         pg.setConfigOptions(antialias=True)
         self.plot_widget = pg.PlotWidget()
-        self.plot_widget.setBackground("#0d1016")
+        self.plot_widget.setBackground("#080b12")
         self.plot_widget.showGrid(x=True, y=True, alpha=0.25)
         self.plot_widget.setLabel("left", "Cook Time", units="ms")
         self.plot_widget.setLabel("bottom", "Graph Operators")

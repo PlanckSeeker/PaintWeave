@@ -114,7 +114,7 @@ class Viewport3D(QOpenGLWidget):
 
         hud_bar = QWidget(self)
         hud_bar.setStyleSheet(
-            "background-color: rgba(14, 16, 21, 200); border: 1px solid #1e2430; border-radius: 6px;"
+            "background-color: rgba(10, 13, 20, 225); border: 1px solid rgba(198, 146, 60, 0.4); border-radius: 6px;"
         )
         hbox = QHBoxLayout(hud_bar)
         hbox.setContentsMargins(8, 4, 8, 4)
@@ -128,7 +128,7 @@ class Viewport3D(QOpenGLWidget):
         )
         self.btn_proj.toggled.connect(self._on_toggle_projection)
 
-        self.btn_wire = QPushButton("🕸️ Wireframe (W)")
+        self.btn_wire = QPushButton("🕸️ Wire (W)")
         self.btn_wire.setCheckable(True)
         self.btn_wire.setFixedHeight(24)
         self.btn_wire.toggled.connect(self._on_toggle_wireframe)
@@ -139,21 +139,21 @@ class Viewport3D(QOpenGLWidget):
         self.btn_grid.setFixedHeight(24)
         self.btn_grid.toggled.connect(self._on_toggle_grid)
 
-        self.btn_shadow = QPushButton("🌑 Shadows")
+        self.btn_shadow = QPushButton("🌑 Shadow")
         self.btn_shadow.setCheckable(True)
         self.btn_shadow.setChecked(True)
         self.btn_shadow.setFixedHeight(24)
         self.btn_shadow.setToolTip("Toggle real-time directional shadow mapping (Pass 1)")
         self.btn_shadow.toggled.connect(self._on_toggle_shadows)
 
-        self.btn_outline = QPushButton("✒️ Outlines (O)")
+        self.btn_outline = QPushButton("✒️ Ink (O)")
         self.btn_outline.setCheckable(True)
         self.btn_outline.setChecked(True)
         self.btn_outline.setFixedHeight(24)
         self.btn_outline.setToolTip("Toggle screen-space stylized ink outlines (Pass 3)")
         self.btn_outline.toggled.connect(self._on_toggle_outlines)
 
-        self.btn_normals = QPushButton("📏 Normals (N)")
+        self.btn_normals = QPushButton("📏 @N")
         self.btn_normals.setCheckable(True)
         self.btn_normals.setFixedHeight(24)
         self.btn_normals.setToolTip("Toggle point normal (@N) hair vectors")
@@ -163,13 +163,13 @@ class Viewport3D(QOpenGLWidget):
         btn_frame.setFixedHeight(24)
         btn_frame.clicked.connect(self.frame_active_geometry)
 
-        btn_reset = QPushButton("↺ Reset Cam")
+        btn_reset = QPushButton("↺ Reset")
         btn_reset.setFixedHeight(24)
         btn_reset.clicked.connect(self.reset_camera)
 
         self.stats_lbl = QLabel("Pts: 0  |  Tris: 0  |  Mats: 0")
         self.stats_lbl.setStyleSheet(
-            "color: #38bdf8; font-weight: 600; border: none; background: transparent;"
+            "color: #e5b869; font-weight: 700; font-family: Consolas, monospace; border: none; background: transparent;"
         )
 
         hbox.addWidget(self.btn_proj)
