@@ -1,0 +1,1279 @@
+{
+  "name": "05_Chunky_Arcane_Diorama",
+  "version": "1.0.0",
+  "nodes": [
+    {
+      "id": "957724e0-dcff-4216-81f6-cd41b24853fc",
+      "type": "SOP_Box",
+      "name": "SOP_Base_Lower",
+      "is_bypassed": false,
+      "params": {
+        "scale_x": 6.8,
+        "scale_y": 0.45,
+        "scale_z": 6.8
+      },
+      "inputs": {},
+      "x": -950.0,
+      "y": -500.0
+    },
+    {
+      "id": "446e12da-74c2-4709-9383-9d02af2d718c",
+      "type": "SOP_Transform",
+      "name": "SOP_Xform_Lower",
+      "is_bypassed": false,
+      "params": {
+        "group": "",
+        "translate_x": 0.0,
+        "translate_y": 0.22,
+        "translate_z": 0.0,
+        "scale_x": 1.0,
+        "scale_y": 1.0,
+        "scale_z": 1.0,
+        "uniform_scale": 1.0
+      },
+      "inputs": {},
+      "x": -750.0,
+      "y": -500.0
+    },
+    {
+      "id": "085564ed-d6e9-4477-979e-b06596614b9d",
+      "type": "SOP_Subdivide",
+      "name": "SOP_Subdiv_Lower",
+      "is_bypassed": false,
+      "params": {
+        "iterations": 1
+      },
+      "inputs": {},
+      "x": -550.0,
+      "y": -500.0
+    },
+    {
+      "id": "af02cbf0-978f-4841-9630-ca20cdc98eea",
+      "type": "SOP_StylizedDamage",
+      "name": "SOP_Damage_Lower",
+      "is_bypassed": false,
+      "params": {
+        "seed": 404,
+        "chip_count": 8,
+        "chip_radius": 0.4,
+        "chip_depth": 0.15,
+        "angularity": 1.6,
+        "tint_damage": true,
+        "damage_color": [
+          0.88,
+          0.84,
+          0.78
+        ]
+      },
+      "inputs": {},
+      "x": -350.0,
+      "y": -500.0
+    },
+    {
+      "id": "9c95c32b-9e96-4ee0-8ef2-9f59cb473f8a",
+      "type": "SOP_Curvature",
+      "name": "SOP_Curv_Lower",
+      "is_bypassed": false,
+      "params": {
+        "highlight_intensity": 1.8,
+        "cavity_intensity": 1.6,
+        "contrast": 1.2,
+        "tint_cd": true,
+        "highlight_color": [
+          1.0,
+          0.98,
+          0.92
+        ],
+        "cavity_color": [
+          0.18,
+          0.16,
+          0.22
+        ]
+      },
+      "inputs": {},
+      "x": -150.0,
+      "y": -500.0
+    },
+    {
+      "id": "1ca8fdeb-07ac-4ce5-ab9a-588e630b30cc",
+      "type": "SOP_Box",
+      "name": "SOP_Base_Upper",
+      "is_bypassed": false,
+      "params": {
+        "scale_x": 4.4,
+        "scale_y": 0.45,
+        "scale_z": 4.4
+      },
+      "inputs": {},
+      "x": -950.0,
+      "y": -350.0
+    },
+    {
+      "id": "69b34401-866e-4cb0-9a04-cea7a336fb22",
+      "type": "SOP_Transform",
+      "name": "SOP_Xform_Upper",
+      "is_bypassed": false,
+      "params": {
+        "group": "",
+        "translate_x": 0.0,
+        "translate_y": 0.67,
+        "translate_z": 0.0,
+        "scale_x": 1.0,
+        "scale_y": 1.0,
+        "scale_z": 1.0,
+        "uniform_scale": 1.0
+      },
+      "inputs": {},
+      "x": -750.0,
+      "y": -350.0
+    },
+    {
+      "id": "e051d602-e3e7-4147-a648-1590e0340eb7",
+      "type": "SOP_Subdivide",
+      "name": "SOP_Subdiv_Upper",
+      "is_bypassed": false,
+      "params": {
+        "iterations": 1
+      },
+      "inputs": {},
+      "x": -550.0,
+      "y": -350.0
+    },
+    {
+      "id": "8118d6f6-fec3-49eb-8ceb-4d0cd8a8a87e",
+      "type": "SOP_StylizedDamage",
+      "name": "SOP_Damage_Upper",
+      "is_bypassed": false,
+      "params": {
+        "seed": 505,
+        "chip_count": 10,
+        "chip_radius": 0.38,
+        "chip_depth": 0.18,
+        "angularity": 1.6,
+        "tint_damage": true,
+        "damage_color": [
+          0.88,
+          0.84,
+          0.78
+        ]
+      },
+      "inputs": {},
+      "x": -350.0,
+      "y": -350.0
+    },
+    {
+      "id": "e4873f98-4e1e-44e3-bb97-44bfeb1325b4",
+      "type": "SOP_Curvature",
+      "name": "SOP_Curv_Upper",
+      "is_bypassed": false,
+      "params": {
+        "highlight_intensity": 1.8,
+        "cavity_intensity": 1.6,
+        "contrast": 1.2,
+        "tint_cd": true,
+        "highlight_color": [
+          1.0,
+          0.98,
+          0.92
+        ],
+        "cavity_color": [
+          0.18,
+          0.16,
+          0.22
+        ]
+      },
+      "inputs": {},
+      "x": -150.0,
+      "y": -350.0
+    },
+    {
+      "id": "3231f5cd-73e1-4c20-b8e5-7f354fb31046",
+      "type": "SOP_Merge",
+      "name": "SOP_Merge_Pedestal",
+      "is_bypassed": false,
+      "params": {},
+      "inputs": {},
+      "x": 80.0,
+      "y": -425.0
+    },
+    {
+      "id": "bb88a35a-cd11-4f5a-91b0-f411a5fcf51c",
+      "type": "SOP_AmbientGradient",
+      "name": "SOP_Grad_Pedestal",
+      "is_bypassed": false,
+      "params": {
+        "blend_mode": "Multiply",
+        "tint_top": [
+          0.75,
+          0.82,
+          0.9
+        ],
+        "tint_bottom": [
+          0.16,
+          0.2,
+          0.32
+        ],
+        "contrast": 1.0,
+        "offset_y": 0.0,
+        "attr_name": "vert_fade"
+      },
+      "inputs": {},
+      "x": 280.0,
+      "y": -425.0
+    },
+    {
+      "id": "798003ed-de37-42e1-9997-270b5f2075ad",
+      "type": "SOP_Material",
+      "name": "SOP_Material_Pedestal",
+      "is_bypassed": false,
+      "params": {
+        "group": "",
+        "material_label": "mat_ancient_stone_base"
+      },
+      "inputs": {},
+      "x": 480.0,
+      "y": -425.0
+    },
+    {
+      "id": "ccc6e553-4cf9-438d-ab21-95bbecff0573",
+      "type": "SOP_Box",
+      "name": "SOP_Monolith_Box",
+      "is_bypassed": false,
+      "params": {
+        "scale_x": 1.8,
+        "scale_y": 3.8,
+        "scale_z": 1.8
+      },
+      "inputs": {},
+      "x": -950.0,
+      "y": -120.0
+    },
+    {
+      "id": "9e8a1b00-677c-4b6e-bd5b-3a3564d4024d",
+      "type": "SOP_Transform",
+      "name": "SOP_Transform_Monolith",
+      "is_bypassed": false,
+      "params": {
+        "group": "",
+        "translate_x": 0.0,
+        "translate_y": 2.6,
+        "translate_z": 0.0,
+        "scale_x": 1.0,
+        "scale_y": 1.0,
+        "scale_z": 1.0,
+        "uniform_scale": 1.0
+      },
+      "inputs": {},
+      "x": -750.0,
+      "y": -120.0
+    },
+    {
+      "id": "233d29eb-7146-4c3b-8cd6-959bb5399be4",
+      "type": "SOP_Subdivide",
+      "name": "SOP_Subdiv_Monolith",
+      "is_bypassed": false,
+      "params": {
+        "iterations": 1
+      },
+      "inputs": {},
+      "x": -550.0,
+      "y": -120.0
+    },
+    {
+      "id": "e95a1349-0269-4738-8073-b370747ebc78",
+      "type": "SOP_StylizedDamage",
+      "name": "SOP_Damage_Monolith",
+      "is_bypassed": false,
+      "params": {
+        "seed": 1337,
+        "chip_count": 16,
+        "chip_radius": 0.48,
+        "chip_depth": 0.28,
+        "angularity": 1.6,
+        "tint_damage": true,
+        "damage_color": [
+          0.88,
+          0.84,
+          0.78
+        ]
+      },
+      "inputs": {},
+      "x": -350.0,
+      "y": -120.0
+    },
+    {
+      "id": "f2b3050f-eb49-485d-80f1-330e1a7cb8b1",
+      "type": "SOP_Curvature",
+      "name": "SOP_Curv_Monolith",
+      "is_bypassed": false,
+      "params": {
+        "highlight_intensity": 2.2,
+        "cavity_intensity": 1.8,
+        "contrast": 1.2,
+        "tint_cd": true,
+        "highlight_color": [
+          1.0,
+          0.96,
+          0.88
+        ],
+        "cavity_color": [
+          0.1,
+          0.12,
+          0.22
+        ]
+      },
+      "inputs": {},
+      "x": -150.0,
+      "y": -120.0
+    },
+    {
+      "id": "884dafdf-dad1-4c6a-a245-cb8bf34084e9",
+      "type": "SOP_AmbientGradient",
+      "name": "SOP_Grad_Monolith",
+      "is_bypassed": false,
+      "params": {
+        "blend_mode": "Multiply",
+        "tint_top": [
+          0.98,
+          0.82,
+          0.68
+        ],
+        "tint_bottom": [
+          0.16,
+          0.2,
+          0.34
+        ],
+        "contrast": 1.0,
+        "offset_y": 0.0,
+        "attr_name": "vert_fade"
+      },
+      "inputs": {},
+      "x": 280.0,
+      "y": -120.0
+    },
+    {
+      "id": "54ce423d-847b-474e-98ca-ed8b9161bb78",
+      "type": "SOP_Material",
+      "name": "SOP_Material_Monolith",
+      "is_bypassed": false,
+      "params": {
+        "group": "",
+        "material_label": "mat_chunky_monolith"
+      },
+      "inputs": {},
+      "x": 480.0,
+      "y": -120.0
+    },
+    {
+      "id": "b6a242d0-1df3-48d5-89fa-e67f941032be",
+      "type": "SOP_Box",
+      "name": "SOP_Trim_Collar",
+      "is_bypassed": false,
+      "params": {
+        "scale_x": 2.2,
+        "scale_y": 0.18,
+        "scale_z": 2.2
+      },
+      "inputs": {},
+      "x": -950.0,
+      "y": 120.0
+    },
+    {
+      "id": "e266d741-271c-4527-b19b-ef94ea5d3db9",
+      "type": "SOP_Transform",
+      "name": "SOP_Xform_Collar",
+      "is_bypassed": false,
+      "params": {
+        "group": "",
+        "translate_x": 0.0,
+        "translate_y": 0.98,
+        "translate_z": 0.0,
+        "scale_x": 1.0,
+        "scale_y": 1.0,
+        "scale_z": 1.0,
+        "uniform_scale": 1.0
+      },
+      "inputs": {},
+      "x": -750.0,
+      "y": 120.0
+    },
+    {
+      "id": "7f336bd6-1cf2-4208-b9aa-a469b6b50cf0",
+      "type": "SOP_Box",
+      "name": "SOP_Trim_Cap",
+      "is_bypassed": false,
+      "params": {
+        "scale_x": 2.1,
+        "scale_y": 0.22,
+        "scale_z": 2.1
+      },
+      "inputs": {},
+      "x": -950.0,
+      "y": 240.0
+    },
+    {
+      "id": "f1976bce-ec2a-4d0d-a5cd-ca6276a3c2b4",
+      "type": "SOP_Transform",
+      "name": "SOP_Xform_Cap",
+      "is_bypassed": false,
+      "params": {
+        "group": "",
+        "translate_x": 0.0,
+        "translate_y": 4.55,
+        "translate_z": 0.0,
+        "scale_x": 1.0,
+        "scale_y": 1.0,
+        "scale_z": 1.0,
+        "uniform_scale": 1.0
+      },
+      "inputs": {},
+      "x": -750.0,
+      "y": 240.0
+    },
+    {
+      "id": "dbfa61c1-aa99-438a-a2f7-8323acd75eb3",
+      "type": "SOP_Merge",
+      "name": "SOP_Merge_Gold_Trims",
+      "is_bypassed": false,
+      "params": {},
+      "inputs": {},
+      "x": -550.0,
+      "y": 180.0
+    },
+    {
+      "id": "c495f34f-9536-4ebe-881c-dfbe149634ac",
+      "type": "SOP_Curvature",
+      "name": "SOP_Curv_Gold",
+      "is_bypassed": false,
+      "params": {
+        "highlight_intensity": 2.5,
+        "cavity_intensity": 1.5,
+        "contrast": 1.2,
+        "tint_cd": true,
+        "highlight_color": [
+          1.0,
+          0.98,
+          0.92
+        ],
+        "cavity_color": [
+          0.18,
+          0.16,
+          0.22
+        ]
+      },
+      "inputs": {},
+      "x": -150.0,
+      "y": 180.0
+    },
+    {
+      "id": "b2e9a111-5501-48d8-bdd5-6739e90010e8",
+      "type": "SOP_Material",
+      "name": "SOP_Material_Gold",
+      "is_bypassed": false,
+      "params": {
+        "group": "",
+        "material_label": "mat_runic_gold_trim"
+      },
+      "inputs": {},
+      "x": 480.0,
+      "y": 180.0
+    },
+    {
+      "id": "4241bcd3-759f-4f44-ad1d-90ab441ae1f8",
+      "type": "SOP_Cylinder",
+      "name": "SOP_Crystal_Main",
+      "is_bypassed": false,
+      "params": {
+        "radius": 0.45,
+        "height": 1.6,
+        "cols": 6,
+        "rows": 1
+      },
+      "inputs": {},
+      "x": -950.0,
+      "y": 420.0
+    },
+    {
+      "id": "dd12ffc0-fcd5-4d0b-8b81-f6d0df4e2ec9",
+      "type": "SOP_Transform",
+      "name": "SOP_Xform_Crys_Main",
+      "is_bypassed": false,
+      "params": {
+        "group": "",
+        "translate_x": 0.0,
+        "translate_y": 5.8,
+        "translate_z": 0.0,
+        "scale_x": 1.0,
+        "scale_y": 1.0,
+        "scale_z": 1.0,
+        "uniform_scale": 1.0
+      },
+      "inputs": {},
+      "x": -750.0,
+      "y": 420.0
+    },
+    {
+      "id": "51c889e3-f599-43e0-a8a1-e00b566115da",
+      "type": "SOP_Cylinder",
+      "name": "SOP_Crystal_Orbit1",
+      "is_bypassed": false,
+      "params": {
+        "radius": 0.2,
+        "height": 0.9,
+        "cols": 5,
+        "rows": 1
+      },
+      "inputs": {},
+      "x": -950.0,
+      "y": 540.0
+    },
+    {
+      "id": "81116a4c-aa3d-4a06-b0bd-0dbe97c209d8",
+      "type": "SOP_Transform",
+      "name": "SOP_Xform_Crys_Orbit1",
+      "is_bypassed": false,
+      "params": {
+        "group": "",
+        "translate_x": -0.85,
+        "translate_y": 5.5,
+        "translate_z": 0.45,
+        "scale_x": 1.0,
+        "scale_y": 1.0,
+        "scale_z": 1.0,
+        "uniform_scale": 1.0
+      },
+      "inputs": {},
+      "x": -750.0,
+      "y": 540.0
+    },
+    {
+      "id": "2ab675c7-9494-4893-a2eb-8feba6647230",
+      "type": "SOP_Cylinder",
+      "name": "SOP_Crystal_Orbit2",
+      "is_bypassed": false,
+      "params": {
+        "radius": 0.16,
+        "height": 0.75,
+        "cols": 5,
+        "rows": 1
+      },
+      "inputs": {},
+      "x": -950.0,
+      "y": 660.0
+    },
+    {
+      "id": "ac6834c2-ddad-46e9-90a7-d61596f4c895",
+      "type": "SOP_Transform",
+      "name": "SOP_Xform_Crys_Orbit2",
+      "is_bypassed": false,
+      "params": {
+        "group": "",
+        "translate_x": 0.75,
+        "translate_y": 6.1,
+        "translate_z": -0.35,
+        "scale_x": 1.0,
+        "scale_y": 1.0,
+        "scale_z": 1.0,
+        "uniform_scale": 1.0
+      },
+      "inputs": {},
+      "x": -750.0,
+      "y": 660.0
+    },
+    {
+      "id": "9b1b1a9c-13f3-40f8-99d5-6b2b4ad77ace",
+      "type": "SOP_Merge",
+      "name": "SOP_Merge_Orbits",
+      "is_bypassed": false,
+      "params": {},
+      "inputs": {},
+      "x": -550.0,
+      "y": 600.0
+    },
+    {
+      "id": "9e9af2f7-c0a9-4d99-946e-6390602c7f5f",
+      "type": "SOP_Merge",
+      "name": "SOP_Merge_Crystals",
+      "is_bypassed": false,
+      "params": {},
+      "inputs": {},
+      "x": -350.0,
+      "y": 480.0
+    },
+    {
+      "id": "b4f5f496-f422-495d-ae44-20d5aadf1447",
+      "type": "SOP_AmbientGradient",
+      "name": "SOP_Grad_Crystals",
+      "is_bypassed": false,
+      "params": {
+        "blend_mode": "Replace",
+        "tint_top": [
+          0.35,
+          0.95,
+          1.0
+        ],
+        "tint_bottom": [
+          0.95,
+          0.2,
+          0.85
+        ],
+        "contrast": 1.0,
+        "offset_y": 0.0,
+        "attr_name": "vert_fade"
+      },
+      "inputs": {},
+      "x": -150.0,
+      "y": 480.0
+    },
+    {
+      "id": "3e27a05e-1d9b-4076-8139-d9e42830b6f3",
+      "type": "SOP_Material",
+      "name": "SOP_Material_Crystal",
+      "is_bypassed": false,
+      "params": {
+        "group": "",
+        "material_label": "mat_arcane_crystal_gem"
+      },
+      "inputs": {},
+      "x": 480.0,
+      "y": 480.0
+    },
+    {
+      "id": "38f3aa70-5f00-4231-8135-1f2692a6d3a2",
+      "type": "SOP_Merge",
+      "name": "SOP_Merge_Stonework",
+      "is_bypassed": false,
+      "params": {},
+      "inputs": {},
+      "x": 700.0,
+      "y": -280.0
+    },
+    {
+      "id": "4885ed8a-4c51-4332-92d8-1cebc6ed2cd6",
+      "type": "SOP_Merge",
+      "name": "SOP_Merge_Structure_Gold",
+      "is_bypassed": false,
+      "params": {},
+      "inputs": {},
+      "x": 900.0,
+      "y": -80.0
+    },
+    {
+      "id": "d36e07a8-77e8-473c-814a-ade041c560dc",
+      "type": "SOP_Merge",
+      "name": "SOP_Merge_Diorama",
+      "is_bypassed": false,
+      "params": {},
+      "inputs": {},
+      "x": 1100.0,
+      "y": 150.0
+    },
+    {
+      "id": "33a07d12-a813-4d00-b3d0-34c68738bf8e",
+      "type": "VOP_ArcaneRamp",
+      "name": "VOP_ArcaneRamp_Base",
+      "is_bypassed": false,
+      "params": {
+        "key_tint": [
+          0.95,
+          0.9,
+          0.82
+        ],
+        "terminator_tint": [
+          0.95,
+          0.38,
+          0.14
+        ],
+        "shadow_tint": [
+          0.12,
+          0.18,
+          0.3
+        ],
+        "terminator_pos": 0.45,
+        "terminator_width": 0.22,
+        "feather": 0.12
+      },
+      "inputs": {},
+      "x": -550.0,
+      "y": 850.0
+    },
+    {
+      "id": "e30c0714-8f6f-4937-8fd0-d9d3fd6e3b32",
+      "type": "VOP_BrushImpasto",
+      "name": "VOP_BrushImpasto_Base",
+      "is_bypassed": false,
+      "params": {
+        "stroke_scale": 32.0,
+        "stroke_stretch": 3.5,
+        "intensity": 0.18,
+        "angle_deg": 35.0
+      },
+      "inputs": {},
+      "x": -300.0,
+      "y": 850.0
+    },
+    {
+      "id": "6bbdba12-e0b0-4061-b37f-ed4cfd4971ec",
+      "type": "VOP_ArcaneRamp",
+      "name": "VOP_ArcaneRamp_Monolith",
+      "is_bypassed": false,
+      "params": {
+        "key_tint": [
+          1.0,
+          0.92,
+          0.78
+        ],
+        "terminator_tint": [
+          0.98,
+          0.4,
+          0.15
+        ],
+        "shadow_tint": [
+          0.12,
+          0.18,
+          0.32
+        ],
+        "terminator_pos": 0.45,
+        "terminator_width": 0.22,
+        "feather": 0.12
+      },
+      "inputs": {},
+      "x": 50.0,
+      "y": 850.0
+    },
+    {
+      "id": "a23c1dd2-3cd1-40b4-85c4-244ec5f6f55e",
+      "type": "VOP_EdgeGlint",
+      "name": "VOP_EdgeGlint_Monolith",
+      "is_bypassed": false,
+      "params": {
+        "glint_color": [
+          1.0,
+          0.96,
+          0.85
+        ],
+        "intensity": 1.5,
+        "glint_width": 2.2
+      },
+      "inputs": {},
+      "x": 300.0,
+      "y": 850.0
+    },
+    {
+      "id": "e4661f6a-1b96-4a3f-ac4b-553e7037a437",
+      "type": "VOP_BrushImpasto",
+      "name": "VOP_BrushImpasto_Monolith",
+      "is_bypassed": false,
+      "params": {
+        "stroke_scale": 42.0,
+        "stroke_stretch": 3.5,
+        "intensity": 0.16,
+        "angle_deg": 35.0
+      },
+      "inputs": {},
+      "x": 550.0,
+      "y": 850.0
+    },
+    {
+      "id": "afc7b2c5-7661-4a4c-81e3-aa4a26c65c3f",
+      "type": "VOP_ArcaneRamp",
+      "name": "VOP_ArcaneRamp_Gold",
+      "is_bypassed": false,
+      "params": {
+        "key_tint": [
+          1.05,
+          0.95,
+          0.75
+        ],
+        "terminator_tint": [
+          0.98,
+          0.45,
+          0.1
+        ],
+        "shadow_tint": [
+          0.28,
+          0.18,
+          0.1
+        ],
+        "terminator_pos": 0.45,
+        "terminator_width": 0.22,
+        "feather": 0.12
+      },
+      "inputs": {},
+      "x": -550.0,
+      "y": 1050.0
+    },
+    {
+      "id": "1623534a-2da2-4651-b034-cdbc803c998c",
+      "type": "VOP_MatCap",
+      "name": "VOP_MatCap_GoldTrim",
+      "is_bypassed": false,
+      "params": {
+        "preset": "Chunky Fantasy Gold",
+        "blend_mode": "Overlay",
+        "intensity": 1.1,
+        "rim_power": 2.0,
+        "roughness": 0.12,
+        "primary_tint": [
+          1.0,
+          0.82,
+          0.32
+        ],
+        "secondary_tint": [
+          0.22,
+          0.65,
+          0.95
+        ]
+      },
+      "inputs": {},
+      "x": -300.0,
+      "y": 1050.0
+    },
+    {
+      "id": "090729a0-eab4-4366-aaf4-96aaeeb71f15",
+      "type": "VOP_EdgeGlint",
+      "name": "VOP_EdgeGlint_Gold",
+      "is_bypassed": false,
+      "params": {
+        "glint_color": [
+          1.0,
+          0.98,
+          0.9
+        ],
+        "intensity": 2.0,
+        "glint_width": 3.2
+      },
+      "inputs": {},
+      "x": -50.0,
+      "y": 1050.0
+    },
+    {
+      "id": "37e0af6f-2ea6-4d87-a8ed-9a32b57f35b1",
+      "type": "VOP_ArcaneRamp",
+      "name": "VOP_ArcaneRamp_Crystal",
+      "is_bypassed": false,
+      "params": {
+        "key_tint": [
+          0.45,
+          0.95,
+          1.0
+        ],
+        "terminator_tint": [
+          0.98,
+          0.18,
+          0.82
+        ],
+        "shadow_tint": [
+          0.15,
+          0.08,
+          0.35
+        ],
+        "terminator_pos": 0.45,
+        "terminator_width": 0.22,
+        "feather": 0.12
+      },
+      "inputs": {},
+      "x": 200.0,
+      "y": 1050.0
+    },
+    {
+      "id": "af39da1b-9349-4708-bf51-c4ebe05ca669",
+      "type": "VOP_MatCap",
+      "name": "VOP_MatCap_CrystalGem",
+      "is_bypassed": false,
+      "params": {
+        "preset": "Arcane Gem",
+        "blend_mode": "Add",
+        "intensity": 1.25,
+        "rim_power": 1.7,
+        "roughness": 0.15,
+        "primary_tint": [
+          0.25,
+          0.88,
+          1.0
+        ],
+        "secondary_tint": [
+          0.95,
+          0.2,
+          0.85
+        ]
+      },
+      "inputs": {},
+      "x": 450.0,
+      "y": 1050.0
+    },
+    {
+      "id": "0d460b00-46b3-4e7f-bae2-59ca183692a5",
+      "type": "VOP_EdgeGlint",
+      "name": "VOP_EdgeGlint_Crystal",
+      "is_bypassed": false,
+      "params": {
+        "glint_color": [
+          0.9,
+          0.98,
+          1.0
+        ],
+        "intensity": 2.4,
+        "glint_width": 3.5
+      },
+      "inputs": {},
+      "x": 700.0,
+      "y": 1050.0
+    }
+  ],
+  "links": [
+    {
+      "id": "97890058-76b2-4b74-9f6b-1f7d56aa6c98",
+      "source_node": "957724e0-dcff-4216-81f6-cd41b24853fc",
+      "source_pin": "Geo",
+      "target_node": "446e12da-74c2-4709-9383-9d02af2d718c",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "233fba74-d6d0-42b4-bad4-1faae5a0fe72",
+      "source_node": "446e12da-74c2-4709-9383-9d02af2d718c",
+      "source_pin": "Geo",
+      "target_node": "085564ed-d6e9-4477-979e-b06596614b9d",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "2c76615e-dec8-44a1-877d-5b51c2e299e6",
+      "source_node": "085564ed-d6e9-4477-979e-b06596614b9d",
+      "source_pin": "Geo",
+      "target_node": "af02cbf0-978f-4841-9630-ca20cdc98eea",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "59b8da4a-1493-4404-add8-414454df9727",
+      "source_node": "af02cbf0-978f-4841-9630-ca20cdc98eea",
+      "source_pin": "Geo",
+      "target_node": "9c95c32b-9e96-4ee0-8ef2-9f59cb473f8a",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "13af0c3f-9e66-4d33-a4c8-4eb919610493",
+      "source_node": "9c95c32b-9e96-4ee0-8ef2-9f59cb473f8a",
+      "source_pin": "Geo",
+      "target_node": "3231f5cd-73e1-4c20-b8e5-7f354fb31046",
+      "target_pin": "Geo1"
+    },
+    {
+      "id": "0f524a24-ae9c-4bd8-ba43-337aa7541fa6",
+      "source_node": "1ca8fdeb-07ac-4ce5-ab9a-588e630b30cc",
+      "source_pin": "Geo",
+      "target_node": "69b34401-866e-4cb0-9a04-cea7a336fb22",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "e8d245ca-b6b8-43d3-956b-76c1868b8e76",
+      "source_node": "69b34401-866e-4cb0-9a04-cea7a336fb22",
+      "source_pin": "Geo",
+      "target_node": "e051d602-e3e7-4147-a648-1590e0340eb7",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "11a4ad98-bb23-424d-961f-b6c4655782e1",
+      "source_node": "e051d602-e3e7-4147-a648-1590e0340eb7",
+      "source_pin": "Geo",
+      "target_node": "8118d6f6-fec3-49eb-8ceb-4d0cd8a8a87e",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "85def643-4e79-4a81-8366-aa066bacbe37",
+      "source_node": "8118d6f6-fec3-49eb-8ceb-4d0cd8a8a87e",
+      "source_pin": "Geo",
+      "target_node": "e4873f98-4e1e-44e3-bb97-44bfeb1325b4",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "0ed58945-01ef-40e2-8478-fcdd93af3382",
+      "source_node": "e4873f98-4e1e-44e3-bb97-44bfeb1325b4",
+      "source_pin": "Geo",
+      "target_node": "3231f5cd-73e1-4c20-b8e5-7f354fb31046",
+      "target_pin": "Geo2"
+    },
+    {
+      "id": "ed011ba1-dc16-45f6-97c9-c9a00d5441f3",
+      "source_node": "3231f5cd-73e1-4c20-b8e5-7f354fb31046",
+      "source_pin": "Geo",
+      "target_node": "bb88a35a-cd11-4f5a-91b0-f411a5fcf51c",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "3dd9714c-67f2-4e64-9196-9296f0365255",
+      "source_node": "bb88a35a-cd11-4f5a-91b0-f411a5fcf51c",
+      "source_pin": "Geo",
+      "target_node": "798003ed-de37-42e1-9997-270b5f2075ad",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "4350a59a-bd3a-46a7-b706-7a73299c27f9",
+      "source_node": "798003ed-de37-42e1-9997-270b5f2075ad",
+      "source_pin": "Geo",
+      "target_node": "38f3aa70-5f00-4231-8135-1f2692a6d3a2",
+      "target_pin": "Geo1"
+    },
+    {
+      "id": "d591d26e-9693-4e2c-b87f-ee842e7b658a",
+      "source_node": "ccc6e553-4cf9-438d-ab21-95bbecff0573",
+      "source_pin": "Geo",
+      "target_node": "9e8a1b00-677c-4b6e-bd5b-3a3564d4024d",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "10030e46-2e20-47a2-ace7-e5fb769ab7c6",
+      "source_node": "9e8a1b00-677c-4b6e-bd5b-3a3564d4024d",
+      "source_pin": "Geo",
+      "target_node": "233d29eb-7146-4c3b-8cd6-959bb5399be4",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "cdb7c898-7349-409c-b8e6-673d326a35fd",
+      "source_node": "233d29eb-7146-4c3b-8cd6-959bb5399be4",
+      "source_pin": "Geo",
+      "target_node": "e95a1349-0269-4738-8073-b370747ebc78",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "69acd1f7-fad3-42e8-b5cf-b2e5ffb182ad",
+      "source_node": "e95a1349-0269-4738-8073-b370747ebc78",
+      "source_pin": "Geo",
+      "target_node": "f2b3050f-eb49-485d-80f1-330e1a7cb8b1",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "1e39e73c-583d-43b2-b8d5-47058f9360c4",
+      "source_node": "f2b3050f-eb49-485d-80f1-330e1a7cb8b1",
+      "source_pin": "Geo",
+      "target_node": "884dafdf-dad1-4c6a-a245-cb8bf34084e9",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "aeeaff11-2518-4fc2-a57e-c7205cb99e98",
+      "source_node": "884dafdf-dad1-4c6a-a245-cb8bf34084e9",
+      "source_pin": "Geo",
+      "target_node": "54ce423d-847b-474e-98ca-ed8b9161bb78",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "8aa07d9d-f213-4ccd-972c-5298e1be7bbe",
+      "source_node": "54ce423d-847b-474e-98ca-ed8b9161bb78",
+      "source_pin": "Geo",
+      "target_node": "38f3aa70-5f00-4231-8135-1f2692a6d3a2",
+      "target_pin": "Geo2"
+    },
+    {
+      "id": "bc9cc814-8ef8-4a34-8d30-48e6b93276df",
+      "source_node": "b6a242d0-1df3-48d5-89fa-e67f941032be",
+      "source_pin": "Geo",
+      "target_node": "e266d741-271c-4527-b19b-ef94ea5d3db9",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "e14da590-35ce-4a70-86f4-d7ca373a9908",
+      "source_node": "e266d741-271c-4527-b19b-ef94ea5d3db9",
+      "source_pin": "Geo",
+      "target_node": "dbfa61c1-aa99-438a-a2f7-8323acd75eb3",
+      "target_pin": "Geo1"
+    },
+    {
+      "id": "a0545ba5-4097-4d99-bf21-65dbffca8b3e",
+      "source_node": "7f336bd6-1cf2-4208-b9aa-a469b6b50cf0",
+      "source_pin": "Geo",
+      "target_node": "f1976bce-ec2a-4d0d-a5cd-ca6276a3c2b4",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "2a93a362-095d-4245-b769-ac7ea58d560c",
+      "source_node": "f1976bce-ec2a-4d0d-a5cd-ca6276a3c2b4",
+      "source_pin": "Geo",
+      "target_node": "dbfa61c1-aa99-438a-a2f7-8323acd75eb3",
+      "target_pin": "Geo2"
+    },
+    {
+      "id": "56cbdbf6-3df8-4386-9055-e7746df6aabc",
+      "source_node": "dbfa61c1-aa99-438a-a2f7-8323acd75eb3",
+      "source_pin": "Geo",
+      "target_node": "c495f34f-9536-4ebe-881c-dfbe149634ac",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "e645db59-43f6-4552-9fa9-93aa660ebde2",
+      "source_node": "c495f34f-9536-4ebe-881c-dfbe149634ac",
+      "source_pin": "Geo",
+      "target_node": "b2e9a111-5501-48d8-bdd5-6739e90010e8",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "0702730a-46d7-4f99-8a63-9e05042788f7",
+      "source_node": "b2e9a111-5501-48d8-bdd5-6739e90010e8",
+      "source_pin": "Geo",
+      "target_node": "4885ed8a-4c51-4332-92d8-1cebc6ed2cd6",
+      "target_pin": "Geo2"
+    },
+    {
+      "id": "5002a8df-473a-4fdf-a784-5a9c6d544409",
+      "source_node": "4241bcd3-759f-4f44-ad1d-90ab441ae1f8",
+      "source_pin": "Geo",
+      "target_node": "dd12ffc0-fcd5-4d0b-8b81-f6d0df4e2ec9",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "983d4b08-4def-40a3-9135-677bf5d9b22c",
+      "source_node": "dd12ffc0-fcd5-4d0b-8b81-f6d0df4e2ec9",
+      "source_pin": "Geo",
+      "target_node": "9e9af2f7-c0a9-4d99-946e-6390602c7f5f",
+      "target_pin": "Geo1"
+    },
+    {
+      "id": "59a0bfa6-3cb8-4477-ab41-f34be381f0a9",
+      "source_node": "51c889e3-f599-43e0-a8a1-e00b566115da",
+      "source_pin": "Geo",
+      "target_node": "81116a4c-aa3d-4a06-b0bd-0dbe97c209d8",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "ad70b7b5-55fa-4057-8de4-6c19f1b4a8f2",
+      "source_node": "81116a4c-aa3d-4a06-b0bd-0dbe97c209d8",
+      "source_pin": "Geo",
+      "target_node": "9b1b1a9c-13f3-40f8-99d5-6b2b4ad77ace",
+      "target_pin": "Geo1"
+    },
+    {
+      "id": "df668799-c0e8-45d1-a282-06a86e4846ac",
+      "source_node": "2ab675c7-9494-4893-a2eb-8feba6647230",
+      "source_pin": "Geo",
+      "target_node": "ac6834c2-ddad-46e9-90a7-d61596f4c895",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "93d43dc7-ce09-439e-a9cb-f5c5f897498d",
+      "source_node": "ac6834c2-ddad-46e9-90a7-d61596f4c895",
+      "source_pin": "Geo",
+      "target_node": "9b1b1a9c-13f3-40f8-99d5-6b2b4ad77ace",
+      "target_pin": "Geo2"
+    },
+    {
+      "id": "b12feaae-bddc-4007-b7ce-e16050c61c03",
+      "source_node": "9b1b1a9c-13f3-40f8-99d5-6b2b4ad77ace",
+      "source_pin": "Geo",
+      "target_node": "9e9af2f7-c0a9-4d99-946e-6390602c7f5f",
+      "target_pin": "Geo2"
+    },
+    {
+      "id": "653fd1c1-0faf-47aa-89ab-18cc2b5d4ece",
+      "source_node": "9e9af2f7-c0a9-4d99-946e-6390602c7f5f",
+      "source_pin": "Geo",
+      "target_node": "b4f5f496-f422-495d-ae44-20d5aadf1447",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "219579a6-4e5c-41c5-8835-f156bd4a4796",
+      "source_node": "b4f5f496-f422-495d-ae44-20d5aadf1447",
+      "source_pin": "Geo",
+      "target_node": "3e27a05e-1d9b-4076-8139-d9e42830b6f3",
+      "target_pin": "Geo"
+    },
+    {
+      "id": "c8f59669-d7ac-46a0-9b07-5b1c9f15a578",
+      "source_node": "3e27a05e-1d9b-4076-8139-d9e42830b6f3",
+      "source_pin": "Geo",
+      "target_node": "d36e07a8-77e8-473c-814a-ade041c560dc",
+      "target_pin": "Geo2"
+    },
+    {
+      "id": "34414ba0-2edd-4641-82ef-c9edd7ed5ffc",
+      "source_node": "38f3aa70-5f00-4231-8135-1f2692a6d3a2",
+      "source_pin": "Geo",
+      "target_node": "4885ed8a-4c51-4332-92d8-1cebc6ed2cd6",
+      "target_pin": "Geo1"
+    },
+    {
+      "id": "b253b8e3-85ff-4a90-af7e-fd6594a64bfb",
+      "source_node": "4885ed8a-4c51-4332-92d8-1cebc6ed2cd6",
+      "source_pin": "Geo",
+      "target_node": "d36e07a8-77e8-473c-814a-ade041c560dc",
+      "target_pin": "Geo1"
+    },
+    {
+      "id": "b9889351-53fa-4d65-b893-ba7811b14305",
+      "source_node": "33a07d12-a813-4d00-b3d0-34c68738bf8e",
+      "source_pin": "Shader",
+      "target_node": "e30c0714-8f6f-4937-8fd0-d9d3fd6e3b32",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "487db029-88be-4dc6-a1f6-4b264a156f6c",
+      "source_node": "e30c0714-8f6f-4937-8fd0-d9d3fd6e3b32",
+      "source_pin": "Shader",
+      "target_node": "798003ed-de37-42e1-9997-270b5f2075ad",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "caef2d04-2f94-45e4-b816-384264ab2f93",
+      "source_node": "6bbdba12-e0b0-4061-b37f-ed4cfd4971ec",
+      "source_pin": "Shader",
+      "target_node": "a23c1dd2-3cd1-40b4-85c4-244ec5f6f55e",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "56deb8e7-6e56-4b05-9e56-95f493cfce46",
+      "source_node": "a23c1dd2-3cd1-40b4-85c4-244ec5f6f55e",
+      "source_pin": "Shader",
+      "target_node": "e4661f6a-1b96-4a3f-ac4b-553e7037a437",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "fa5246da-d260-4bd6-ac07-fc2f0c083c60",
+      "source_node": "e4661f6a-1b96-4a3f-ac4b-553e7037a437",
+      "source_pin": "Shader",
+      "target_node": "54ce423d-847b-474e-98ca-ed8b9161bb78",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "28969d9b-77dd-4c53-854f-3bba726cfefd",
+      "source_node": "afc7b2c5-7661-4a4c-81e3-aa4a26c65c3f",
+      "source_pin": "Shader",
+      "target_node": "1623534a-2da2-4651-b034-cdbc803c998c",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "ecf2d7b2-e360-4033-a505-11cbdc17b557",
+      "source_node": "1623534a-2da2-4651-b034-cdbc803c998c",
+      "source_pin": "Shader",
+      "target_node": "090729a0-eab4-4366-aaf4-96aaeeb71f15",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "beabfafa-d8dd-46e4-a50e-a9ef17acd44d",
+      "source_node": "090729a0-eab4-4366-aaf4-96aaeeb71f15",
+      "source_pin": "Shader",
+      "target_node": "b2e9a111-5501-48d8-bdd5-6739e90010e8",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "ac65ccbb-f664-455b-9ed1-7bcfcc80b374",
+      "source_node": "37e0af6f-2ea6-4d87-a8ed-9a32b57f35b1",
+      "source_pin": "Shader",
+      "target_node": "af39da1b-9349-4708-bf51-c4ebe05ca669",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "e263087c-dbb2-462d-a20a-7db217aebc12",
+      "source_node": "af39da1b-9349-4708-bf51-c4ebe05ca669",
+      "source_pin": "Shader",
+      "target_node": "0d460b00-46b3-4e7f-bae2-59ca183692a5",
+      "target_pin": "Shader"
+    },
+    {
+      "id": "fc4f67da-8e8b-454b-a466-703fbc34578d",
+      "source_node": "0d460b00-46b3-4e7f-bae2-59ca183692a5",
+      "source_pin": "Shader",
+      "target_node": "3e27a05e-1d9b-4076-8139-d9e42830b6f3",
+      "target_pin": "Shader"
+    }
+  ],
+  "display_sop_id": "d36e07a8-77e8-473c-814a-ade041c560dc",
+  "template_sop_id": null,
+  "display_vop_id": "e4661f6a-1b96-4a3f-ac4b-553e7037a437"
+}

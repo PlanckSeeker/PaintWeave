@@ -1,159 +1,230 @@
-# PaintWeave Studio
+# 🎨 PaintWeave Studio (v2.0)
 
-**PaintWeave** is a modular, Houdini-inspired desktop IDE and visual programming studio for procedural geometry (**SOPs**), multi-material primitive shading (**VOPs** & **NWShader**), and GPU/CUDA-accelerated field operations[cite: 1, 2].
-
----
-
-## Key Architectural Features
-
-* **Columnar Copy-on-Write (CoW) Geometry Engine (`Geometry`)**:
-  * Attributes across `Points`, `Vertices`, `Primitives`, and `Detail` domains backed by contiguous `float32`/`uint32`/`int32` NumPy arrays and optional **PyTorch CUDA** tensor acceleration[cite: 1, 2].
-  * Zero-copy attribute sharing via `Geometry.clone()` across downstream SOP nodes until a specific attribute column is replaced[cite: 2].
-* **Multi-Material Primitive Shading (`SOP_Material` + `SOP_Merge`)**:
-  * Bind distinct VOP shader chains or full `NWShader` programs to specific point/primitive groups (`@group_<name>` $\rightarrow$ `@material_id`)[cite: 1, 2].
-  * `SOP_Merge` automatically remaps `@material_id` buffers and merges `detail["materials"]` tables so multiple materials render simultaneously in a single mesh[cite: 1, 2].
-* **Studio-Grade Dockable Desktop IDE (`PySide6` + `NodeGraphQt` + `ModernGL`)**:
-  * **NodeGraphQt Canvas**: Color-coded typed ports (`Geometry`, `Shader`, `Float`, `Int`, `Vec3`), curved pipes, `Tab` quick-search, 64-step Undo/Redo, Copy/Paste/Duplicate, and Houdini **Display (`DISP`)**, **Template (`TMPL`)**, and **Bypass (`BYP`)** flags[cite: 1, 2].
-  * **ModernGL 3D Viewport**: OpenGL 4.3 Core context with MSAA×4, hybrid Orthographic (Isometric) / Perspective camera, pink ghost Template wireframe overlay, `@N` normal hair visualizer, orientation gizmo, and `F12` 1080p offscreen PNG rendering[cite: 1, 2].
-  * **Schema-Driven Parameter Inspector (`ParamSpec`)**: Auto-generated sliders, spinboxes, enum dropdowns, RGB color pickers, file dialogs, and live `NWShader` uniform reflection[cite: 1, 2].
-  * **Tabbed Workbench**: Virtualized zero-copy `QAbstractTableModel` Geometry & Material Spreadsheet, dual-pane Wrangle/NWShader Code Studio with live compiled GLSL preview, and `pyqtgraph` Cook Profiler[cite: 1, 2].
+> **The Procedural Stylized Art Studio**  
+> *Where Houdini procedural graph mechanics meet the chunky, hand-painted aesthetic of Arcane, Dofus, and Hearthstone.*
 
 ---
 
-## Quickstart & CLI Usage
+## 🌟 What is PaintWeave?
 
-### 1. Launch the Desktop Studio
+**PaintWeave Studio** is an artist-centric procedural 3D modeling and shading environment engineered specifically for stylized, painterly artwork.
+
+While traditional 3D DCC tools focus on physically based photorealism (PBR) and complex engineering CAD workflows, PaintWeave treats 3D models as interactive digital paintings:
+* **Chunky, Exaggerated Silhouettes**: Procedural stone chisel notches, chipped wooden edges, and beveled facets that evoke the physical miniature props of *Hearthstone* and *Dofus*.
+* **Painterly Lighting**: Warm-to-cool lighting models replacing harsh photorealism with saturated vermilion terminator bands inspired by *Arcane* (Fortiche).
+* **Hand-Painted Finishes**: Real-time gouache edge wear, directional hog-bristle impasto brush drag, and camera-space spherical MatCaps for gleaming gold trims and magical gems.
+* **Graphic Ink Outlines**: Real-time screen-space Sobel edge detection over geometry normals and linear depth, framing silhouettes in comic ink.
+
+---
+
+## ⚡ What's New in v2.0
+
+### 1. In-Place Zero-Reallocation VBO Streaming
+PaintWeave v2.0 replaces per-frame GPU buffer reallocation with a smart topology-hash cache:
+* **Fast-Path Streaming**: When topology remains stable during noise modulation, interactive parameter scrubbing, or Python/CUDA point wrangles, vertex and normal buffers stream directly into existing GPU VBOs via in-place memory writes (`.write()`).
+* **Zero Frame Stutter**: Eliminates GPU heap reallocation and VAO teardowns, providing smooth real-time procedural sculpting.
+
+### 2. 3-Pass Deferred / Hybrid Stylized Compositor
+A dedicated multi-pass frame pipeline designed for graphic, non-photorealistic rendering:
+
+```
+[CPU / CUDA Scene Cook]
+        │
+        ▼ (In-Place VBO Streaming)
+┌────────────────────────────────────────────────────────────────────────┐
+│ PASS 1: Directional Shadow Map (2048x2048 Depth FBO)                   │
+│  • Renders depth using lightweight hardware shadow-caster shader       │
+│  • Outputs: tex_shadow_depth (16-tap PCF soft shadows)                 │
+└────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ PASS 2: Scene Geometry + G-Buffer MRT Pass (Offscreen FBO)             │
+│  • Attachment 0 (RGBA8): Shaded Color + Arcane Ramps + PCF Shadows     │
+│  • Attachment 1 (RGBA16F): World/View Normal (RGB) + Linear Depth (A)  │
+│  • Renders Grid, Multi-Material Batches, Template Ghost, Normal Hairs  │
+└────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ PASS 3: Screen-Space Stylized Outline & Composite Pass (Screen FBO)    │
+│  • Fullscreen quad sampling Color + Normal/Depth G-Buffer textures     │
+│  • 3x3 Sobel edge detection over Normal & Depth gradients              │
+│  • Composites ink outlines over shaded color + renders Corner Gizmo    │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### 3. The "Chunky Painterly Fantasy" Operator Suite
+* [`SOP_AmbientGradient`](src/paintweave/nodes/sop/attributes.py): Bounding-box top-to-bottom value fade (`@vert_fade` $\in [0, 1]$), applying Blizzard-style value grounding and vertex tinting (`Multiply`, `Tint`, `Replace`) directly onto `@Cd`.
+* [`SOP_Curvature`](src/paintweave/nodes/sop/attributes.py): Discrete Laplacian curvature estimator isolating convex ridges (`@highlight`) for chalky edge wear and concave crevices (`@cavity`) for pooled grime.
+* [`SOP_StylizedDamage`](src/paintweave/nodes/sop/modifiers.py): Procedurally carves chunky triangular notches, chipped corners, and chisel dents into geometry edges with angular falloff and normal recalculation.
+* [`VOP_ArcaneRamp`](src/paintweave/nodes/vop/lighting.py): 3-stop painterly lighting model featuring a hyper-saturated warm vermilion terminator band bridging sunlit peach light and deep teal ambient bounce.
+* [`VOP_EdgeGlint`](src/paintweave/nodes/vop/lighting.py): Gouache/chalk edge wear and specular glints along facets and beveled edges using screen-space normal derivatives (`dFdx`/`dFdy`) and Fresnel response.
+* [`VOP_BrushImpasto`](src/paintweave/nodes/vop/lighting.py): Overlays directional hog-bristle brush drag and oil-paint impasto canvas texture onto surface shading.
+* [`VOP_MatCap`](src/paintweave/nodes/vop/lighting.py): View-space spherical reflections with zero matrix overhead, featuring built-in procedural presets for **Chunky Fantasy Gold**, **Arcane Gem**, **Toon Metal**, and **Chalky Clay**.
+
+---
+
+## 🏛️ Showcase Presets (`examples/`)
+
+| File | Theme | Description |
+| :--- | :--- | :--- |
+| **`05_chunky_arcane_diorama.pw`** | **Chunky Arcane Diorama** | **(v2.0 Flagship)** Complete 4-tier fantasy altar featuring weathered stone pedestal steps, a chiseled rune monolith, beveled gold trims (`VOP_MatCap` Gold), and hovering arcane power crystals (`VOP_MatCap` Gem) bound across 4 distinct multi-material shaders. |
+| **`01_arcanepunk_canyon_diorama.pw`** | **Arcanepunk Canyon** | Swept curved canyon cliffs, elevation ramp shading, and floating crystals. |
+| **`02_multi_material_crystal_shrine.pw`** | **Crystal Shrine** | Multi-material scattering, normal-aligned point instancing, and Bayer dither terrain shading. |
+| **`03_cuda_ripple_wrangle.pw`** | **CUDA Wave Simulation** | PyTorch GPU tensor wrangle calculating a 2D dynamic wave ripple on a subdivided grid. |
+| **`04_swept_arcane_tendrils_uv.pw`** | **Swept Tendrils & UV** | 3D spiral curve sweep with procedural UV coordinate projection and UV checker validation. |
+
+---
+
+## 🚀 Quickstart & Desktop Workflow
+
+### Prerequisites
+* **Python 3.10+** (64-bit)
+* **OpenGL 4.3 Core Profile** capable graphics card (NVIDIA / AMD / Intel)
+* *(Optional)* **NVIDIA CUDA Toolkit & PyTorch** for hardware-accelerated tensor wrangles.
+
+### Installation via `uv`
 ```bash
+# Clone the repository
+git clone https://github.com/ayoub-ben/paintweave.git
+cd paintweave
+
+# Sync dependencies into isolated environment
 uv sync
+
+# Launch PaintWeave Studio
 uv run paintweave
 ```
 
-### 2. Headless CLI Evaluation & Wavefront `.obj` Export
-PaintWeave includes a zero-GUI command-line runner (`paintweave-cli`) for batch cooking `.pw` / `.nw` graphs and exporting meshes[cite: 1, 2]:
+### Headless CLI Runner (`paintweave-cli`)
+PaintWeave includes a headless CLI runner for automation pipelines, batch network cooking, and Wavefront `.obj` export:
 
 ```bash
-# Inspect compute backend (CUDA / PyTorch / NumPy)
+# Display compute backend summary (PyTorch CUDA / NumPy)
 uv run paintweave-cli --info
 
 # Cook the active Display SOP of a project and export to Wavefront OBJ
-uv run paintweave-cli examples/02_multi_material_crystal_shrine.pw -o shrine.obj
+uv run paintweave-cli examples/05_chunky_arcane_diorama.pw -o diorama.obj
 ```
 
 ---
 
-## Operator Catalog (45 Built-In Nodes)
+## 📚 Complete Operator Catalog (50+ Operators)
 
-| Context | Category | Registered Operators (`type_id`) |
+### SOP Context *(Surface Geometry Operators)*
+
+| Category | Operator (`type_id`) | Description |
 | :--- | :--- | :--- |
-| **SOP** *(Geometry)* | **Primitives** | `SOP_Grid`, `SOP_Box`, `SOP_Cylinder`, `SOP_Sphere`, `SOP_Curve` *(Helix/Arc/Wave/Line)*, `SOP_File` *(Wavefront `.obj`)*[cite: 2] |
-| **SOP** *(Geometry)* | **Modifiers** | `SOP_Transform`, `SOP_Mountain` *(CUDA/CPU FBM)*, `SOP_Extrude` *(PolyExtrude)*, `SOP_Subdivide`, `SOP_Facet`, `SOP_Smooth` *(Laplacian)*, `SOP_Normal`, `SOP_Sweep` *(Curve Tube)*, `SOP_Raycast` *(Project to Surface)*[cite: 2] |
-| **SOP** *(Geometry)* | **Attributes & Groups** | `SOP_Group` *(Bounding Box)*, `SOP_Color`, `SOP_AttributeRandomize`, `SOP_UVProject` *(Planar/Cyl/Sph/Triplanar)*, `SOP_Wrangle` *(Python/NumPy/PyTorch)*[cite: 2] |
-| **SOP** *(Geometry)* | **Instancing & Topology** | `SOP_Scatter`, `SOP_CopyToPoints` *(with `@N` alignment & `@pscale`)*, `SOP_Merge` *(Multi-Material)*[cite: 2] |
-| **SOP** *(Geometry)* | **Materials & Shading** | `SOP_Material` *(Group-aware `ShaderPayload` binder)*[cite: 2] |
-| **VOP** *(Shader)* | **Lighting** | `VOP_IsoLight`, `VOP_RimLight`, `VOP_Fresnel`, `VOP_CelToon`[cite: 2] |
-| **VOP** *(Shader)* | **Patterns** | `VOP_Checkerboard`, `VOP_Noise`, `VOP_SimplexNoise3D` *(3D FBM)*, `VOP_UVChecker`, `VOP_ColorRamp`[cite: 2] |
-| **VOP** *(Shader)* | **Post & Stylized** | `VOP_BayerDither` *(4×4 Ordered Dither)*, `VOP_Blend`, `VOP_Gamma`[cite: 2] |
-| **VOP** *(Shader)* | **Programmable Shaders** | `VOP_Wrangle` *(Inline GLSL)*, `VOP_NWShader` *(Spatial Vertex + Fragment GLSL)*[cite: 2] |
-| **MATH** *(Utility)* | **Scalars, Vectors & Time** | `Math_Float`, `Math_Add`, `Math_Multiply`, `Math_Vec3`, `Math_FloatToVec3`, `Math_Time` *(`$T`)*, `Math_ArcaneOscillator`[cite: 2] |
+| **Primitives** | `SOP_Grid` | Parametric quad mesh grid with customizable row/col density. |
+| | `SOP_Box` | 3D box/cube primitive with dimensional scales. |
+| | `SOP_Cylinder` | Parametric cylinder and faceted polygonal prism with caps. |
+| | `SOP_Sphere` | UV sphere primitive with adjustable latitude/longitude rings. |
+| | `SOP_Curve` | Parametric 3D curves (Helix, Spiral, Arc, Sine Wave, Line). |
+| | `SOP_File` | Wavefront `.obj` mesh file loader with auto normal computation. |
+| **Modifiers** | `SOP_Transform` | Translates, rotates, and scales `@P` with optional point group masking. |
+| | `SOP_Mountain` | Fractal Brownian Motion (FBM) displacement (PyTorch CUDA / CPU). |
+| | `SOP_Subdivide` | Loop/Catmull-style midpoint mesh subdivision. |
+| | `SOP_Smooth` | Discrete Laplacian mesh smoothing and feature softening. |
+| | `SOP_Normal` | Computes or recalculates unit vertex normals (`@N`). |
+| | `SOP_Sweep` | Sweeps cross-section profiles along 3D backbone curves. |
+| | `SOP_Raycast` | Projects points along ray directions onto collision target surfaces. |
+| | `SOP_StylizedDamage` | Procedurally chips triangular corner notches and chisel gouges along sharp edges. |
+| **Attributes & Groups** | `SOP_AmbientGradient` | Top-to-bottom bounding box value wash (`@vert_fade`) and color blending. |
+| | `SOP_Curvature` | Isolates convex ridges (`@highlight`) and concave crevices (`@cavity`). |
+| | `SOP_Group` | Creates point and primitive groups via bounding box volumes. |
+| | `SOP_Color` | Applies constant RGB colors or attribute color sweeps onto `@Cd`. |
+| | `SOP_AttributeRandomize` | Randomizes 1D, 2D, or 3D point attributes (`pscale`, `Cd`, `N`). |
+| | `SOP_UVProject` | Planar, Cylindrical, Spherical, and Box UV projection with transform gizmo. |
+| | `SOP_Wrangle` | High-performance Python/NumPy/PyTorch vector scripting on `@P`, `@N`, and `@Cd`. |
+| **Materials & Merging** | `SOP_Material` | Binds upstream VOP/NWShader chains to primitive groups via `@material_id`. |
+| | `SOP_Merge` | Concatenates geometry streams while preserving multi-material bindings and 1D/3D attributes. |
+| | `SOP_Scatter` | Distributes random Poisson/uniform points across surface primitives. |
+| | `SOP_CopyToPoints` | Instantiates source geometry onto target points with automatic normal alignment. |
+
+### VOP Context *(Visual & Programmable Shading Operators)*
+
+| Category | Operator (`type_id`) | Description |
+| :--- | :--- | :--- |
+| **Stylized Lighting** | `VOP_ArcaneRamp` | 3-stop lighting with hyper-saturated warm vermilion terminator bridge. |
+| | `VOP_EdgeGlint` | Hand-painted gouache bevel glints using screen-space normal derivatives. |
+| | `VOP_BrushImpasto` | Directional hog-bristle brush drag and oil-paint impasto canvas texture. |
+| | `VOP_MatCap` | View-space spherical reflections (Fantasy Gold, Arcane Gem, Toon Metal, Clay). |
+| | `VOP_IsoLight` | Dynamic isometric directional sunlight with ambient floor control. |
+| | `VOP_RimLight` | Grazing-angle Fresnel rim glow with customizable falloff power. |
+| | `VOP_Fresnel` | View-angle Fresnel reflection and refraction factor. |
+| | `VOP_CelToon` | Quantized stepped toon lighting bands. |
+| **Procedural Patterns** | `VOP_SimplexNoise3D` | 3D spatial Simplex noise generating FBM procedural textures. |
+| | `VOP_UVChecker` | High-visibility UV alignment checkerboard pattern. |
+| | `VOP_Checkerboard` | 2D procedural checker pattern with dual color inputs. |
+| | `VOP_ColorRamp` | Linear coordinate-to-color gradient ramp. |
+| | `VOP_Noise` | 2D procedural Perlin/Value noise. |
+| **Post & Composite** | `VOP_BayerDither` | Retro 4x4 Bayer matrix ordered cross-hatch dithering. |
+| | `VOP_Blend` | Layer blending modes (Mix, Multiply, Screen, Overlay, Add). |
+| | `VOP_Gamma` | Color space gamma correction and contrast curves. |
+| **Programmable Code** | `VOP_NWShader` | Godot-style spatial shader transpiler with live uniform reflection in Inspector. |
+| | `VOP_Wrangle` | Inline GLSL fragment snippet wrangle. |
 
 ---
 
-## End-to-End Walkthroughs
+## 🎨 Programmable Spatial Shaders (`VOP_NWShader`)
 
-### 1. Multi-Material Crystal Shrine Diorama (`SOP` + `VOP` + `NWShader`)
-This network builds the default multi-material diorama (`_build_default_showcase_network`), combining a dithered canyon terrain with instanced bioluminescent crystal monoliths[cite: 2]:
-
-```text
-Stream 1 (Canyon Terrain):
-  [SOP_Grid] ──(Geo)──► [SOP_Mountain (CUDA)] ─────────────────────(Geo)──► [SOP_Material: mat_terrain_dither]
-                               │                                                        ▲ (Shader)
-                               │                     [VOP_IsoLight] ──► [VOP_RimLight] ──► [VOP_BayerDither]
-                               │                                                                │
-                               ▼ (Geo)                                                          ▼ (Geo1)
-Stream 2 (Crystal Monoliths): [SOP_Scatter] ──► [SOP_AttributeRandomize (@pscale)]         [SOP_Merge] (DISP)
-                                                         │                                      ▲ (Geo2)
-                              [SOP_Cylinder] ──(Source)──┴──(TargetPoints)──► [SOP_CopyToPoints] │
-                                                                                     │ (Geo)    │
-                                               [VOP_NWShader] ──(Shader)──► [SOP_Material: mat_crystal_bio]
-```
-
-1. **Terrain Generation & Shading**:
-   * Spawn `SOP_Grid` (`size_x=8.0, size_z=8.0, rows=48, cols=48`) $\rightarrow$ `SOP_Mountain` (`frequency=1.6, octaves=3, roughness=0.45, Amplitude=1.15`)[cite: 2].
-   * Chain `VOP_IsoLight` $\rightarrow$ `VOP_RimLight` $\rightarrow$ `VOP_BayerDither` and wire both the terrain and shader into `SOP_Material` (`material_label="mat_terrain_dither"`)[cite: 2].
-2. **Normal-Aligned Crystal Instancing**:
-   * Branch `SOP_Mountain.Geo` into `SOP_Scatter` (`num_points=28`) $\rightarrow$ `SOP_AttributeRandomize` (`attribute="pscale", min_value=0.35, max_value=0.95`)[cite: 2].
-   * Wire a 6-sided `SOP_Cylinder` into `SOP_CopyToPoints.Source` and the scattered points into `SOP_CopyToPoints.TargetPoints` (`align_to_normal=True` rotates each crystal to match the terrain slope `@N`)[cite: 2].
-   * Bind a custom `VOP_NWShader` to the crystals via a second `SOP_Material` (`material_label="mat_crystal_bio"`)[cite: 2].
-3. **Multi-Material Merge**:
-   * Connect both `SOP_Material` outputs to `SOP_Merge` (`Geo1`, `Geo2`) and double-click `SOP_Merge` to set its **Display Flag (`DISP`)**[cite: 2].
-   * Open the **Geometry & Material Spreadsheet** tab and switch the domain dropdown to **`Materials`** to inspect the assigned triangle counts and uniforms per `material_id`[cite: 2].
-
----
-
-### 2. Python / PyTorch Geometry Wrangle (`SOP_Wrangle`)
-Select any `SOP_Wrangle` node and open the **Wrangle & NWShader Studio** tab (`Ctrl+Enter` to apply and recook)[cite: 2]. All point attributes (`P`, `N`, `Cd`, `uv`, `pscale`, or custom attributes) are injected into the sandbox scope as `(num_points, k)` NumPy arrays alongside `np`, `torch`, and `num_points`[cite: 2]:
-
-```python
-# Available in scope: P, N, Cd, uv, np, torch, num_points
-# Radial ripple wave with height-based color ramp
-r = np.sqrt(P[:, 0]**2 + P[:, 2]**2)
-P[:, 1] += np.sin(r * 3.5) * np.exp(-0.2 * r) * 0.65
-
-# Compute normalized elevation and write to @Cd
-h = (P[:, 1] - P[:, 1].min()) / (P[:, 1].max() - P[:, 1].min() + 1e-6)
-Cd[:, 0] = 0.12 + 0.25 * h
-Cd[:, 1] = 0.45 + 0.45 * h
-Cd[:, 2] = 0.85 - 0.30 * h
-```
-Any new or modified array matching `(num_points, k)` in scope is automatically written back to the output `Geometry` and vertex normals (`@N`) are recomputed[cite: 2].
-
----
-
-### 3. Programmable Spatial Shaders (`VOP_NWShader`)
-`VOP_NWShader` transpiles Godot-style `shader_type spatial;` scripts into GLSL 330 Core vertex and fragment programs[cite: 2]. Built-in noise functions (`hash(vec3)`, `snoise(vec3)`, `fbm(vec3)`) and stage globals (`VERTEX`, `NORMAL`, `COLOR`, `UV`, `VIEW`, `TIME`, `ALBEDO`, `EMISSION`) are available out of the box, and `uniform` declarations with `: hint_range(min, max)` or `: source_color` are automatically reflected into sliders and color pickers in the **Node Parameter Inspector**[cite: 2]:
+`VOP_NWShader` allows writing concise, high-level spatial shaders with automatic Inspector UI generation:
 
 ```glsl
 shader_type spatial;
 
-uniform float bend : hint_range(-2.0, 2.0) = 0.35;
 uniform float pulse_speed : hint_range(0.0, 10.0) = 2.5;
-uniform vec3 bio_color : source_color = vec3(0.14, 0.88, 0.98);
-
-void vertex() {
-    float curve = pow(max(VERTEX.y, 0.0) * 0.35, 2.0);
-    VERTEX.x += curve * bend;
-}
+uniform vec3 crystal_glow : source_color = vec3(0.25, 0.88, 1.0);
+uniform float rim_power : hint_range(0.5, 6.0) = 2.2;
 
 void fragment() {
-    float fresnel = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 2.6);
-    float pulse = 0.55 + 0.45 * sin(TIME * pulse_speed + VERTEX.y * 4.0);
-    float noise_vein = smoothstep(0.45, 0.85, fbm(VERTEX * 2.5));
-    ALBEDO = mix(vec3(0.08, 0.11, 0.18), bio_color * 0.45, noise_vein);
-    EMISSION = bio_color * (fresnel * pulse * 1.8 + noise_vein * 0.35);
+    float fresnel = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), rim_power);
+    float pulse = 0.65 + 0.35 * sin(TIME * pulse_speed + VERTEX.y * 3.0);
+    ALBEDO = mix(vec3(0.08, 0.12, 0.20), crystal_glow * 0.45, fresnel);
+    EMISSION = crystal_glow * (fresnel * pulse * 2.0);
 }
 ```
 
 ---
 
-## Studio Shortcuts & Controls
+## ⌨️ Studio Controls & Shortcuts
 
 | Context | Shortcut / Action | Description |
 | :--- | :--- | :--- |
-| **Node Canvas** | `Tab` | Open operator quick-search popup[cite: 2] |
-| **Node Canvas** | `Double-Click Node` | Set node as active **Display (`DISP`)** operator[cite: 2] |
-| **Node Canvas** | `Ctrl+Z` / `Ctrl+Y` | Undo / Redo graph modifications[cite: 2] |
-| **Node Canvas** | `Ctrl+C` / `Ctrl+V` / `Ctrl+D` | Copy / Paste / Duplicate selected nodes & internal links[cite: 2] |
-| **3D Viewport** | `LMB / MMB Drag` | Orbit camera around target[cite: 2] |
-| **3D Viewport** | `RMB Drag` or `Shift + Drag` | Pan camera target[cite: 2] |
-| **3D Viewport** | `Mouse Wheel` | Zoom camera in / out[cite: 2] |
-| **3D Viewport** | `A` / `E` | Rotate camera yaw by $-45^\circ$ / $+45^\circ$[cite: 2] |
-| **3D Viewport** | `F` or `H` | Frame active Display SOP geometry bounds[cite: 2] |
-| **3D Viewport** | `W` / `N` | Toggle Wireframe / Point Normal (`@N`) hair vectors[cite: 2] |
-| **Code Studio** | `Ctrl+Enter` | Apply Wrangle / NWShader script and recook[cite: 2] |
-| **Global** | `F5` / `F12` | Force recook network / Render 1920×1080 PNG frame[cite: 2] |
+| **Node Canvas** | `Tab` | Open operator quick-search palette popup |
+| **Node Canvas** | `Double-Click Node` | Set node as active **Display (`DISP`)** operator |
+| **Node Canvas** | `Ctrl + Z` / `Ctrl + Y` | Undo / Redo network modifications |
+| **Node Canvas** | `Ctrl + C` / `Ctrl + V` | Copy / Paste selected operators |
+| **Node Canvas** | `Ctrl + D` | Duplicate selected operators with input connections |
+| **Node Canvas** | `Delete` | Remove selected nodes |
+| **3D Viewport** | `LMB / MMB Drag` | Orbit camera around center of interest |
+| **3D Viewport** | `RMB Drag` or `Shift + Drag` | Pan camera target |
+| **3D Viewport** | `Mouse Wheel` | Zoom camera in / out |
+| **3D Viewport** | `A` / `E` | Rotate camera yaw by $-45^\circ$ / $+45^\circ$ |
+| **3D Viewport** | `F` or `H` | Frame camera to active Display SOP bounding box |
+| **3D Viewport** | `W` | Toggle Wireframe display overlay |
+| **3D Viewport** | `N` | Toggle Point Normal (`@N`) hair vector visualizer |
+| **Code Studio** | `Ctrl + Enter` | Recompile and cook active Wrangle / NWShader code |
+| **Global** | `F5` | Force re-cook active network from scratch |
+| **Global** | `F12` | Render active viewport to 1080p offscreen PNG |
 
 ---
 
-## License
+## 🧪 Automated Test Suite
 
-MIT License — see `pyproject.toml` for details[cite: 1].
+PaintWeave is fully tested with unit and GUI integration coverage:
+
+```bash
+# Run the complete test suite
+uv run pytest -v
+
+# Run code linter
+uv run ruff check src tests
+```
+
+---
+
+## 📄 License
+
+MIT License — see `pyproject.toml` for details.
